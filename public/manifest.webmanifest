@@ -1,0 +1,22 @@
+{
+  "id": "/",
+  "name": "CSE Prep Desk — Job Circular & Exam Preparation",
+  "short_name": "CSE Prep",
+  "description": "Personal CSE government job circulars, MCQ and written exam preparation.",
+  "start_url": "/#dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#17283d",
+  "lang": "bn-BD",
+  "orientation": "any",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Job Circulars", "url": "/#circulars", "description": "Browse tracked IT job circulars" },
+    { "name": "MCQ Practice", "url": "/#practice", "description": "Practice CSE topic-wise questions" },
+    { "name": "Mock Test", "url": "/#mock", "description": "Take a timed examination" }
+  ]
+}

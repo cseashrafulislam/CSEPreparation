@@ -1,0 +1,11 @@
+{
+  "name": "csepreparation",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/build.mjs && node --test tests/*.test.mjs",
+    "check": "node --check public/app.js && node --check public/core.js && node --check public/data/jobs.js && node --check public/data/questions.js && npm test"
+  }
+}

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17283d">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="CSE government job circulars, BUET-style exam practice, topic-wise MCQ, written answers and offline mock tests—your personal preparation desk.">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <title>CSE Prep Desk — Circular & Exam Preparation</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand" aria-label="CSE Prep Desk">
+        <div class="brand-mark">C<span>.</span></div>
+        <div class="brand-copy"><strong>CSE Prep Desk</strong><small>YOUR CAREER COMPANION</small></div>
+      </div>
+      <div class="side-caption">WORKSPACE</div>
+      <nav class="side-nav" aria-label="প্রধান মেনু">
+        <a href="#dashboard" data-nav="dashboard"><span class="nav-icon">◫</span> ড্যাশবোর্ড</a>
+        <a href="#circulars" data-nav="circulars"><span class="nav-icon">▤</span> চাকরির সার্কুলার <span class="nav-dot"></span></a>
+        <a href="#practice" data-nav="practice"><span class="nav-icon">◈</span> MCQ প্র্যাকটিস</a>
+        <a href="#written" data-nav="written"><span class="nav-icon">✎</span> Written প্রস্তুতি</a>
+        <a href="#syllabus" data-nav="syllabus"><span class="nav-icon">▥</span> BUET রোডম্যাপ</a>
+        <a href="#mock" data-nav="mock"><span class="nav-icon">◷</span> মডেল টেস্ট</a>
+      </nav>
+      <div class="side-caption extra-gap">PERSONAL TOOLS</div>
+      <nav class="side-nav" aria-label="ব্যক্তিগত টুল">
+        <a href="#notes" data-nav="notes"><span class="nav-icon">▧</span> নোট ও ব্যাকআপ</a>
+      </nav>
+      <div class="side-bottom">
+        <div class="side-status"><span class="online-pulse"></span> Free · No login · Offline ready</div>
+        <p>শুধু আপনার প্রস্তুতির জন্য। কোনো অ্যাকাউন্ট বা পেইড সার্ভিস নেই।</p>
+      </div>
+    </aside>
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+    <div class="workspace">
+      <header class="topbar">
+        <button class="icon-button menu-toggle" data-action="menu" aria-label="মেনু খুলুন">☰</button>
+        <div class="breadcrumb"><span>MY WORKSPACE</span><span class="divider-dot">/</span><strong id="section-title">ড্যাশবোর্ড</strong></div>
+        <div class="top-actions">
+          <span class="date-label" id="today-label"></span>
+          <button class="icon-button" data-action="theme" aria-label="থিম পরিবর্তন" title="Light / Dark mode"><span id="theme-icon">☾</span></button>
+          <button class="install-btn" id="install-btn" data-action="install">↧ <span>Install App</span></button>
+          <span class="avatar" title="Personal workspace">ME</span>
+        </div>
+      </header>
+      <main id="app" tabindex="-1"></main>
+      <footer class="footer">CSE Prep Desk <span>•</span> Personal offline-first workspace <span>•</span> Check original circular before applying</footer>
+    </div>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <input type="file" id="restore-input" accept="application/json,.json" hidden>
+  <noscript><p style="padding:2rem">এই অ্যাপ ব্যবহারের জন্য JavaScript চালু রাখতে হবে।</p></noscript>
+</body>
+</html>
