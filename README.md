@@ -2,6 +2,7 @@
 
 Personal, fully static, offline-capable PWA for **Bangladesh CSE/IT government job circulars and exam preparation**. One user, no login, no payments, no server, no database, no R2.
 
+
 ## Included
 
 - Verified-source circular snapshots for Petrobangla, BCIC and BPATC with automatic expiry display.
