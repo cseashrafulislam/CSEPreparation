@@ -1,5 +1,6 @@
 import { STORAGE_KEY, loadState, saveState, normalizeState, bangladeshToday, daysRemaining, jobPhase, escapeHtml as h, safeHttps, shuffle, scoreMock, validateCustomJob, dailyPracticeCount } from "./core.js";
 import { officialJobs, JOBS_LAST_CHECKED, sourceLinks } from "./data/jobs.js";
+import { DISCOVERY_ITEMS, DISCOVERY_LAST_RUN, DISCOVERY_FEEDS_OK } from "./data/discovered.js";
 import { questions, writtenQuestions, topics } from "./data/questions.js";
 
 let state = loadState();
@@ -132,13 +133,14 @@ function renderDashboard() {
           <div class="topic-chip">③ Timed mock test <span>২৫ মিনিট</span></div>
           <button class="button full mt" data-action="goto" data-target="syllabus">পুরো Study Roadmap →</button>
         </section>
-        <section class="panel"><span class="badge">Verified snapshot</span><p class="side-tip mt">সার্কুলার সর্বশেষ ম্যানুয়ালি যাচাই: <strong>${labelDate(JOBS_LAST_CHECKED)}</strong>। এটি স্বয়ংক্রিয় লাইভ ফিড নয়। আবেদন করার আগে অবশ্যই মূল PDF পড়বেন।</p></section>
+        <section class="panel"><span class="badge">Daily discovery</span><p class="side-tip mt">প্রতিদিন নতুন IT/CSE নিয়োগের সম্ভাব্য লিংক খোঁজার অটোমেশন রয়েছে। <strong>${DISCOVERY_ITEMS.length}টি</strong> লিংক পাওয়া গেছে। শেষ সফল পরীক্ষা: <strong>${DISCOVERY_LAST_RUN ? labelDate(DISCOVERY_LAST_RUN.slice(0, 10)) : "প্রথম রান অপেক্ষমাণ"}</strong>। এগুলো অফিশিয়াল বিজ্ঞপ্তি হিসেবে যাচাই করা নয়।</p><button class="button soft full mt" data-action="goto" data-target="circulars">নতুন খোঁজ দেখুন →</button></section>
       </div>
     </div>`;
 }
 
 function renderCirculars() {
   const search = ui.jobSearch.toLocaleLowerCase();
+  const discovered = DISCOVERY_ITEMS.filter(job => `${job.title} ${job.publisher}`.toLocaleLowerCase().includes(search));
   let jobs = allJobs().filter(job => {
     const matchSearch = `${job.title} ${job.organization} ${job.note || ""} ${(job.tags || []).join(" ")}`.toLowerCase().includes(search);
     const matchSector = ui.jobSector === "All" || job.sector === ui.jobSector;
@@ -165,15 +167,25 @@ function renderCirculars() {
       </select>${job.custom ? `<button class="button small danger" data-action="delete-job" data-id="${h(job.id)}">Delete</button>` : ""}</div></div>
     </article>`;
   };
-  return `${section("CSE Job Circulars", "সরকারি, আধা-সরকারি, ব্যাংক ও NGO-র IT/CSE পদের নিজের তালিকা।",
+  const discoveryList = discovered.slice(0, 35).map(job => `<article class="discovery-card">
+    <div><span class="badge urgent">যাচাই বাকি</span><small class="muted">${h(labelDate(job.publishedOn))} · ${h(job.publisher)}</small></div>
+    <h3>${h(job.title)}</h3><p>নিউজ-সূচি থেকে স্বয়ংক্রিয়ভাবে পাওয়া সম্ভাব্য বিজ্ঞপ্তি। পদ, যোগ্যতা ও আবেদনের শেষ সময় মূল নিয়োগকারী প্রতিষ্ঠানের ওয়েবসাইটে নিশ্চিত করুন।</p>
+    <a class="button small" href="${h(safeHttps(job.url))}" target="_blank" rel="noopener noreferrer">খবর / সূত্র দেখুন ↗</a>
+  </article>`).join("");
+  const discoveryBanner = `<section class="panel discovery-panel"><div class="panel-header"><div><h2>প্রতিদিন স্বয়ংক্রিয় নতুন খোঁজ <span class="badge">${DISCOVERY_ITEMS.length} links</span></h2><p class="panel-subtitle">শেষ সফল আপডেট: ${DISCOVERY_LAST_RUN ? labelDate(DISCOVERY_LAST_RUN.slice(0, 10)) : "প্রথম অটোমেশন চালুর অপেক্ষায়"} · সফল উৎস: ${DISCOVERY_FEEDS_OK}/6</p></div></div>
+    <div class="info-banner"><b>!</b><p>এগুলো নিউজ সার্চ থেকে পাওয়া <strong>যাচাই না-করা সূত্র</strong>, নিশ্চিত চাকরির সার্কুলার নয়। ভুয়া নিয়োগ এড়াতে অফিসিয়াল PDF এবং আবেদন পোর্টালের শেষ তারিখ দেখে নিন। প্রতিদিন সকাল আনুমানিক ৭:১৭ (বাংলাদেশ সময়) GitHub Actions নতুন লিংক খোঁজে; বিলম্ব বা উৎস ব্যর্থ হলে তালিকা নাও বদলাতে পারে।</p></div>
+    ${ui.jobStatus !== "All" || ui.jobSector !== "All" ? '<p class="side-tip">নতুন খোঁজ দেখতে Status ও Sector ফিল্টার “সব” রাখুন।</p>' : (discovered.length ? `<div class="discovery-grid">${discoveryList}</div><p class="caption mt">খুঁজে পাওয়া ${discovered.length}টির মধ্যে প্রথম ${Math.min(discovered.length, 35)}টি দেখানো হচ্ছে।</p>` : '<p class="side-tip">এখনো নতুন প্রাসঙ্গিক লিংক নেই। অটোমেশন প্রথমবার সফল হলে এখানে দেখাবে।</p>')}
+    </section>`;
+  return `${section("CSE Job Circulars", "অফিশিয়ালি যাচাই করা সার্কুলার ও প্রতিদিন স্বয়ংক্রিয়ভাবে পাওয়া নতুন সূত্র।",
     '<button class="button primary" data-action="add-job">+ সার্কুলার যোগ করুন</button>')}
-    <div class="info-banner"><b>ⓘ</b><p>এটি ${labelDate(JOBS_LAST_CHECKED)}-এ যাচাই করা snapshot; নতুন বিজ্ঞপ্তি নিজে যোগ করা যাবে। আবেদন করার আগে মূল সরকারি PDF-তে বয়স, CGPA, সময় ও পদ নিশ্চিত করুন।</p></div>
+    <div class="info-banner"><b>ⓘ</b><p>যাচাই করা মূল সার্কুলার সর্বশেষ ${labelDate(JOBS_LAST_CHECKED)}-এ পর্যালোচিত। স্বয়ংক্রিয় সূত্রগুলো আলাদাভাবে “যাচাই বাকি” দেখানো হয়। আবেদন করার আগে সরকারি PDF-তে বয়স, CGPA, সময় ও পদ নিশ্চিত করুন।</p></div>
     <div class="toolbar"><label class="search-box"><input class="input" id="job-search" type="search" placeholder="প্রতিষ্ঠান, পদ বা কিওয়ার্ড..." value="${h(ui.jobSearch)}" aria-label="সার্কুলার খুঁজুন"></label>
       <select class="select" id="job-sector" aria-label="খাত"><option value="All">সব খাত</option>${["Government","Semi-government","Bank","NGO","Other"].map(s => `<option value="${s}"${ui.jobSector === s ? " selected" : ""}>${s}</option>`).join("")}</select>
       <select class="select" id="job-filter" aria-label="স্ট্যাটাস"><option value="All">সব স্ট্যাটাস</option>${["Open","Closed","Saved"].map(s => `<option value="${s}"${ui.jobStatus === s ? " selected" : ""}>${s}</option>`).join("")}</select>
       <label class="checkbox-inline"><input id="show-expired" type="checkbox"${ui.showExpired ? " checked" : ""}> Expired দেখুন</label>
     </div>
-    <div class="section-grid"><div><p class="caption">${notice(jobs.length)} সার্কুলার পাওয়া গেছে</p><div class="job-list">${jobs.length ? jobs.map(card).join("") : '<div class="empty"><div class="empty-icon">⌕</div><strong>কোনো সার্কুলার পাওয়া যায়নি</strong><p>ফিল্টার বদলে দেখুন অথবা নিজে নতুন সার্কুলার যুক্ত করুন।</p></div>'}</div></div>
+    ${discoveryBanner}
+    <div class="section-grid"><div><p class="caption">${notice(jobs.length)} যাচাই করা/নিজের সার্কুলার</p><div class="job-list">${jobs.length ? jobs.map(card).join("") : '<div class="empty"><div class="empty-icon">⌕</div><strong>কোনো সার্কুলার পাওয়া যায়নি</strong><p>ফিল্টার বদলে দেখুন অথবা নিজে নতুন সার্কুলার যুক্ত করুন।</p></div>'}</div></div>
     <aside class="stack"><section class="panel"><div class="panel-header"><div><h3>অফিশিয়াল উৎস</h3><p class="panel-subtitle">নতুন Circular খুঁজতে</p></div></div>
       ${sourceLinks.map(link => `<a class="source-link" href="${h(safeHttps(link.url))}" target="_blank" rel="noopener noreferrer"><span>↗</span><span><strong>${h(link.name)}</strong><small>${h(link.detail)}</small></span><span class="arrow">↗</span></a>`).join("")}
     </section><section class="panel"><h3>আপনার ৩টি গুরুত্বপূর্ণ বিষয়</h3><p class="side-tip mt">বয়স ২৯, BSc CSE (CGPA 3.80) ও ৪+ বছরের অভিজ্ঞতা। তবে প্রতিটি পদের SSC/HSC, বয়সসীমা ও অভিজ্ঞতার শর্ত আলাদাভাবে নিশ্চিত করুন।</p><button class="button soft full" data-action="goto" data-target="practice">প্রস্তুতি শুরু →</button></section>
@@ -347,7 +359,7 @@ function renderMock() {
       <div class="heading-actions mb"><button class="button primary" data-action="mock-new">+ New Test</button><button class="button" data-action="goto" data-target="practice">Topic Practice →</button></div><section class="panel"><h3>উত্তর ও ব্যাখ্যা</h3>${review}</section>`;
   }
   return `${head}<div class="section-grid"><section class="panel"><div class="eyebrow">EXAM SIMULATOR</div><h2>শুরু করুন আপনার পরের পরীক্ষা</h2><p class="side-tip">প্রশ্ন এলোমেলো হবে, সময় শেষ হলে স্বয়ংক্রিয়ভাবে জমা হবে। স্কোর ও ভুল উত্তর স্থানীয়ভাবে সংরক্ষিত থাকবে।</p>
-    <div class="mock-setup"><div class="form-field"><label for="mock-count">প্রশ্ন সংখ্যা</label><select class="select" id="mock-count"><option>10</option><option selected>20</option><option>40</option></select></div>
+    <div class="mock-setup"><div class="form-field"><label for="mock-count">প্রশ্ন সংখ্যা</label><select class="select" id="mock-count"><option>10</option><option selected>20</option><option>40</option><option>50</option><option>100</option></select></div>
     <div class="form-field"><label for="mock-minutes">সময় (মিনিট)</label><select class="select" id="mock-minutes"><option>10</option><option selected>25</option><option>45</option><option>60</option></select></div>
     <div class="form-field"><label for="mock-focus">বিষয়</label><select class="select" id="mock-focus"><option value="All">Technical + General</option><option value="Technical">Technical only</option><option value="General">General only</option></select></div></div>
     <button class="button primary" data-action="start-mock">Start Exam →</button></section>

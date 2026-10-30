@@ -1,0 +1,41 @@
+name: Daily CSE circular discovery
+
+on:
+  schedule:
+    # 07:17 Bangladesh Standard Time (UTC+6), subject to GitHub scheduling delays.
+    - cron: '17 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-cse-circulars
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch fresh CSE/IT circular leads
+        run: node scripts/update-circulars.mjs
+      - name: Validate site and generated feed
+        run: npm run check
+      - name: Commit and deploy through Cloudflare Pages Git integration
+        run: |
+          git add public/data/discovered.js
+          if git diff --cached --quiet; then
+            echo 'No changes to publish.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: update CSE circular discovery index'
+          git push origin HEAD:main

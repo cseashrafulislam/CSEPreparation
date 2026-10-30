@@ -1,4 +1,6 @@
 // Original practice questions: these are NOT claimed to be leaked or official past questions.
+import { advancedRows, advancedWritten } from "./advanced.js";
+import { drillRows } from "./drills.js";
 // Each row: topic, difficulty, prompt, four options, zero-based answer, English explanation, Bangla explanation.
 const rows = [
   ["Data Structures","Easy","What is the worst-case time complexity of binary search on a sorted array?",["O(1)","O(log n)","O(n)","O(n²)"],1,"Binary search halves the search interval on each step.","প্রতি ধাপে খোঁজার পরিসর অর্ধেক হয়, তাই O(log n)।"],
@@ -98,7 +100,7 @@ const rows = [
   ["General Knowledge","Medium","What is the capital of Bangladesh?",["Chattogram","Dhaka","Rajshahi","Khulna"],1,"Dhaka is the capital city.","বাংলাদেশের রাজধানী ঢাকা।"],
 ];
 
-export const questions = rows.map(([topic, difficulty, prompt, options, answer, explain, bn], index) => ({
+export const questions = [...rows, ...advancedRows, ...drillRows].map(([topic, difficulty, prompt, options, answer, explain, bn], index) => ({
   id: `q${String(index + 1).padStart(3, "0")}`,
   category: ["Mathematics","English","Bangla","General Knowledge"].includes(topic) ? "General" : "Technical",
   topic, difficulty, prompt, options, answer, explain, bn
@@ -121,6 +123,7 @@ export const writtenQuestions = [
   { id: "w14", topic: "English", prompt: "Write a concise formal email requesting an examination schedule.", answer: "Subject: Request for Recruitment Examination Schedule\nDear Sir/Madam,\nI would be grateful if you could share the tentative schedule for the recruitment examination for the Assistant Programmer position. Thank you for your assistance.\nSincerely,\n[Your Name]", bn: "Formal email-এ subject, greeting, সুনির্দিষ্ট অনুরোধ ও closing রাখুন।" },
   { id: "w15", topic: "Bangla", prompt: "বাংলায় একটি সরকারি চাকরির আবেদনপত্রের কাঠামো লিখুন।", answer: "তারিখ → বরাবর (কর্তৃপক্ষের পদবি ও ঠিকানা) → বিষয় → সম্ভাষণ → সংক্ষিপ্ত মূল বক্তব্য (পদ, যোগ্যতা, আগ্রহ) → বিনীত অনুরোধ → ধন্যবাদ → বিনীত নিবেদক ও সংযুক্তির তালিকা।", bn: "আবেদনপত্র সংক্ষিপ্ত, শুদ্ধ, তথ্যভিত্তিক ও প্রাসঙ্গিক রাখুন।" },
   { id: "w16", topic: "General Knowledge", prompt: "Briefly explain why the Bangladesh Constitution is important to public administration.", answer: "The Constitution is the supreme legal framework for state institutions, fundamental rights, public authority and accountability. Public servants must work within constitutional and statutory limits.", bn: "সংবিধান রাষ্ট্রীয় ক্ষমতা, নাগরিক অধিকার এবং প্রশাসনিক জবাবদিহিতার মূল কাঠামো।" },
+  ...advancedWritten,
 ];
 
 export const topics = [...new Set(questions.map(item => item.topic))];

@@ -6,6 +6,6 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node scripts/build.mjs && node --test tests/*.test.mjs",
-    "check": "node --check public/app.js && node --check public/core.js && node --check public/data/jobs.js && node --check public/data/questions.js && npm test"
+    "check": "node --check public/app.js && node --check public/core.js && node --check public/data/jobs.js && node --check public/data/discovered.js && node --check public/data/questions.js && node --check public/data/advanced.js && node --check public/data/drills.js && node --check scripts/discovery-core.mjs && node --check scripts/update-circulars.mjs && npm test"
   }
 }

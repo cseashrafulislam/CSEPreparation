@@ -14,7 +14,7 @@ test("all local PWA manifest icons and core offline assets exist", () => {
     assert.equal(icon.type, "image/png");
   }
   const serviceWorker = readFileSync(resolve(publicDir, "sw.js"), "utf8");
-  for (const asset of ["/", "/index.html", "/styles.css", "/app.js", "/core.js", "/data/jobs.js", "/data/questions.js", "/manifest.webmanifest", "/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png"]) {
+  for (const asset of ["/", "/index.html", "/styles.css", "/app.js", "/core.js", "/data/jobs.js", "/data/discovered.js", "/data/questions.js", "/data/advanced.js", "/data/drills.js", "/manifest.webmanifest", "/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png"]) {
     assert.ok(serviceWorker.includes(`"${asset}"`), `Not cached by SW: ${asset}`);
     if (asset !== "/") assert.ok(existsSync(resolve(publicDir, asset.slice(1))), `Missing ${asset}`);
   }
