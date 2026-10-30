@@ -12,6 +12,14 @@ export const DEFAULT_STATE = {
   attempts: [],
   activeMock: null,
   notes: [],
+  trackId: "all",
+  unitDone: [],
+  labDrafts: {},
+  labResults: {},
+  writtenDrafts: {},
+  writtenResults: {},
+  reviewSchedule: {},
+  activity: [],
 };
 
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -23,8 +31,32 @@ export function normalizeState(input) {
   result.theme = result.theme === "dark" ? "dark" : "light";
   result.dailyGoal = Math.max(5, Math.min(100, Number(result.dailyGoal) || 15));
   result.answers = result.answers && typeof result.answers === "object" && !Array.isArray(result.answers) ? result.answers : {};
-  for (const key of ["bookmarks", "writtenDone", "customJobs", "attempts", "notes"])
+  for (const key of ["bookmarks", "writtenDone", "customJobs", "attempts", "notes", "unitDone", "activity"])
     result[key] = Array.isArray(result[key]) ? result[key].slice(0, 2000) : [];
+  result.trackId = ["all", "technical", "bank", "developer"].includes(result.trackId) ? result.trackId : "all";
+  result.unitDone = [...new Set(result.unitDone.filter(item => typeof item === "string" && item.length < 70))];
+  for (const key of ["labDrafts", "writtenDrafts"]) {
+    const data = result[key] && typeof result[key] === "object" && !Array.isArray(result[key]) ? result[key] : {};
+    result[key] = Object.fromEntries(Object.entries(data).slice(0, 1500)
+      .filter(([id, value]) => id.length <= 80 && typeof value === "string")
+      .map(([id, value]) => [id, value.slice(0, 10000)]));
+  }
+  for (const key of ["labResults", "writtenResults"]) {
+    const data = result[key] && typeof result[key] === "object" && !Array.isArray(result[key]) ? result[key] : {};
+    result[key] = Object.fromEntries(Object.entries(data).slice(0, 1500)
+      .filter(([id, rating]) => id.length <= 80 && ["solved", "retry"].includes(rating)));
+  }
+  const review = result.reviewSchedule && typeof result.reviewSchedule === "object" && !Array.isArray(result.reviewSchedule) ? result.reviewSchedule : {};
+  result.reviewSchedule = Object.fromEntries(Object.entries(review).slice(0, 30000)
+    .filter(([id, entry]) => id.length < 80 && entry && /^\d{4}-\d{2}-\d{2}$/.test(entry.due))
+    .map(([id, entry]) => [id, {
+      due: entry.due,
+      last: typeof entry.last === "string" ? entry.last.slice(0, 10) : entry.due,
+      streak: Number.isInteger(entry.streak) ? Math.max(0, Math.min(20, entry.streak)) : 0,
+      reviews: Number.isInteger(entry.reviews) ? Math.max(0, Math.min(9999, entry.reviews)) : 0
+    }]));
+  result.activity = result.activity.filter(entry => entry && /^\d{4}-\d{2}-\d{2}$/.test(entry.date) && typeof entry.topic === "string")
+    .map(entry => ({ date: entry.date, topic: entry.topic.slice(0, 80), correct: Boolean(entry.correct) })).slice(-2000);
   result.customJobs = result.customJobs.filter(j => j && typeof j === "object").flatMap(job => {
     try { return [validateCustomJob(job)]; } catch { return []; }
   });
@@ -129,6 +161,7 @@ export function validateCustomJob(input) {
   };
 }
 
-export function dailyPracticeCount(answers, today = bangladeshToday()) {
+export function dailyPracticeCount(answers, today = bangladeshToday(), activity = []) {
+  if (activity?.length) return activity.filter(value => value.date === today).length;
   return Object.values(answers).filter(value => value?.at?.slice(0, 10) === today).length;
 }

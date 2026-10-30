@@ -7,11 +7,14 @@ Personal, fully static, offline-capable PWA for **Bangladesh CSE/IT government j
 
 - Verified-source circular snapshots for Petrobangla, BCIC and BPATC with automatic expiry display, plus a separate **automated daily discovery** section for unverified CSE/IT job leads.
 - Search/filter circulars; save application status (Saved, Applied, Exam prep); add your own official HTTPS circulars.
-- **501 original MCQ questions** over **19 subjects**, including algorithm/data-structure, DBMS, OS, networking, compiler, architecture, digital logic, automata, security, C#, APIs, language/GK and quantitative drills.
+- **2,079 MCQ practice prompts** over **19 subjects**. This is transparently split into **344 hand-authored concept/scenario questions** and **1,735 parameterized numerical drill variants**. Variants build speed and calculation accuracy, and do **not** represent 1,735 distinct theoretical concepts or official past papers.
 - Instant correct-answer feedback with English and Bangla explanations; bookmarks, wrong-answer retry, unseen-question filter.
-- **51 written practice questions** with sample answers and studied status.
-- Four-week BUET-style study roadmap and previous-question reference (historical example, not a guaranteed 2026 pattern).
-- Timed mock exams with 10/20/40/50/100 random questions, technical/general selection, saved progress, results, explanations, and history.
+- **26 topic-based guided study units** with concepts, checklist, common pitfalls and written exercises; **4 selectable tracks**: all-round CSE/IT, technical written, bank IT and developer practical.
+- **40 offline practical problems** (coding, SQL, analytical written) with hints, reference solutions, self-assessment rubric, saved drafts and revision status. Code/SQL is not executed or auto-graded by this app.
+- **51 written practice questions**, with your own drafted answers saved locally, show/hide reference answers, studied state and self-assessment.
+- **Eight-week flexible study roadmap** and a clearly labeled third-party historical previous-question reference (not a guaranteed current BUET/employer exam pattern).
+- Timed mocks with 10/20/50/100/200 selected questions, topic-balanced selection within your track, difficulty filters, optional 0/0.25/0.5 wrong-answer deduction, saved progress, reviewed results and history.
+- **Spaced review** after correct/wrong MCQ attempts, due-question practice, per-topic answer accuracy/coverage, weak-topic recommendations and recent-activity graph.
 - Personal study notes, daily goal, JSON export/restore, light/dark mode, responsive layout.
 - Installable PWA with a service worker: the app and built-in question bank work offline after the first load.
 
@@ -59,11 +62,11 @@ The bundled jobs in `public/data/jobs.js` are a *manual snapshot checked on 2026
 
 - For a new official listing available only to you, click **+ সার্কুলার যোগ করুন** on the app. This item is saved locally to the current browser, not to GitHub.
 - For a listing that should appear on all your devices, edit `public/data/jobs.js`, update `JOBS_LAST_CHECKED` only after source verification, and push to GitHub.
-- To refresh question content, update `public/data/questions.js`, `public/data/advanced.js` or `public/data/drills.js` and deploy. Online requests revalidate cached assets; bump the `VERSION` string in `public/sw.js` for substantial releases so old caches are cleaned.
+- To refresh question content, edit the authored rows in `public/data/questions.js`, `public/data/advanced.js`, `public/data/exam-rows.js` or add and validate more hand-authored rows. The calculated variants live in `public/data/drills.js` and `public/data/numerical-scenarios.js`. **Append new questions** to preserve existing question IDs and study progress. Online requests revalidate cached assets; bump the `VERSION` string in `public/sw.js` for substantial releases so old caches are cleaned.
 
 ## Privacy and backups
 
-There is **no authentication**: anyone who knows the public Pages URL can view the bundled questions and circulars. Do not put private credentials, photos, or personal details in the GitHub repository. Your practice answers, status, notes and custom circulars stay in your own browser's localStorage, not in Cloudflare databases. A different browser/device has separate progress. Export and restore JSON under **Notes & Backup** to transfer your work. Clearing site data can delete local progress. The downloaded JSON backup may contain personal notes—store it privately.
+There is **no authentication**: anyone who knows the public Pages URL can view the bundled questions and circulars. Do not put private credentials, photos, or personal details in the GitHub repository. Your MCQ/review progress, written drafts, lab drafts, status, notes and custom circulars stay in your own browser's localStorage, not in Cloudflare databases. A different browser/device has separate progress. Export and restore JSON under **Notes & Backup** to transfer your work. Clearing site data can delete local progress. The downloaded JSON backup may contain personal notes—store it privately.
 
 ## Development
 
@@ -76,4 +79,4 @@ python3 -m http.server 8000 --directory public
 
 Visit `http://localhost:8000`. No `npm install` is required. All browser files live in `public/`; source tests live in `tests/`.
 
-This is a study aid, not an affiliated official government service. Exam pattern and marks can change; this question bank is original practice content, **not official past questions or guaranteed exam suggestions**. The 501 MCQs include deterministic computational drills: they increase practice volume but do not replace textbooks, verified past papers or a complete syllabus.
+This is a study aid, not an affiliated official government service. Exam pattern and marks can change; this question bank is original practice content, **not official past questions or guaranteed exam suggestions**. Numerical variants deliberately increase repeat practice volume; they must not be mistaken for independently researched concepts or proof of examination readiness. The 26-unit Academy is an organized **preparation outline, not a complete replacement for textbooks, verified past papers or the exact recruiting agency's syllabus**. The app now covers the main workflow of a personal preparation desk, but building a truly exhaustive vetted 10,000-question bank requires sustained question writing, source checks and content review; that volume has **not** been claimed or silently fabricated.

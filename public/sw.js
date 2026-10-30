@@ -1,7 +1,8 @@
-const VERSION = "cseprep-v2-circulars-20261030";
+const VERSION = "cseprep-v3-complete-study-20261030";
 const CORE = [
-  "/", "/index.html", "/styles.css", "/app.js", "/core.js",
+  "/", "/index.html", "/styles.css", "/app.js", "/core.js", "/preparation-core.js",
   "/data/jobs.js", "/data/discovered.js", "/data/questions.js", "/data/advanced.js", "/data/drills.js",
+  "/data/exam-rows.js", "/data/numerical-scenarios.js", "/data/curriculum.js", "/data/labs.js",
   "/manifest.webmanifest", "/icon.svg",
   "/icons/icon-192.png", "/icons/icon-512.png"
 ];

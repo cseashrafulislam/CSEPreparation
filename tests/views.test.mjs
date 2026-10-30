@@ -28,12 +28,28 @@ test("every built-in route renders without a browser dependency", async () => {
     globalThis.location = { hash: "#dashboard", protocol: "http:", hostname: "test.invalid" };
     globalThis.localStorage = { getItem: () => null, setItem() {} };
     await import("../public/app.js");
-    for (const name of ["dashboard", "circulars", "practice", "written", "syllabus", "mock", "notes"]) {
+    for (const name of ["dashboard", "circulars", "academy", "practice", "lab", "written", "syllabus", "mock", "analytics", "notes"]) {
       globalThis.location.hash = `#${name}`;
       listeners["window:hashchange"]();
       assert.ok(element("app").innerHTML.length > 300, `Empty ${name} page`);
     }
     assert.match(element("app").innerHTML, /Backup/);
+    const click = (action, id, other = {}) => listeners.click({
+      target: { id: "", matches: () => false, closest: () => ({ dataset: { action, id, ...other } }) }
+    });
+    globalThis.location.hash = "#academy";
+    listeners["window:hashchange"]();
+    assert.match(element("app").innerHTML, /Data Structures/);
+    click("unit-done", "ds-array");
+    assert.match(element("app").innerHTML, /✓ Completed/);
+    click("unit-open", "ds-array");
+    assert.match(element("app").innerHTML, /Hash collision/);
+    globalThis.location.hash = "#lab";
+    listeners["window:hashchange"]();
+    click("lab-solution");
+    assert.match(element("app").innerHTML, /Reference solution/);
+    click("lab-rate", "lab-001", { rating: "solved" });
+    assert.match(element("app").innerHTML, /selected" data-action="lab-rate" data-id="lab-001"/);
   } finally {
     globalThis.document = originalDocument;
     globalThis.window = originalWindow;

@@ -1,6 +1,8 @@
 // Original practice questions: these are NOT claimed to be leaked or official past questions.
 import { advancedRows, advancedWritten } from "./advanced.js";
 import { drillRows } from "./drills.js";
+import { examRows } from "./exam-rows.js";
+import { numericalScenarioRows } from "./numerical-scenarios.js";
 // Each row: topic, difficulty, prompt, four options, zero-based answer, English explanation, Bangla explanation.
 const rows = [
   ["Data Structures","Easy","What is the worst-case time complexity of binary search on a sorted array?",["O(1)","O(log n)","O(n)","O(n²)"],1,"Binary search halves the search interval on each step.","প্রতি ধাপে খোঁজার পরিসর অর্ধেক হয়, তাই O(log n)।"],
@@ -100,10 +102,14 @@ const rows = [
   ["General Knowledge","Medium","What is the capital of Bangladesh?",["Chattogram","Dhaka","Rajshahi","Khulna"],1,"Dhaka is the capital city.","বাংলাদেশের রাজধানী ঢাকা।"],
 ];
 
-export const questions = [...rows, ...advancedRows, ...drillRows].map(([topic, difficulty, prompt, options, answer, explain, bn], index) => ({
+const originalCount = rows.length + advancedRows.length;
+const existingCount = originalCount + drillRows.length;
+const authoredCount = existingCount + examRows.length;
+export const questions = [...rows, ...advancedRows, ...drillRows, ...examRows, ...numericalScenarioRows].map(([topic, difficulty, prompt, options, answer, explain, bn], index) => ({
   id: `q${String(index + 1).padStart(3, "0")}`,
   category: ["Mathematics","English","Bangla","General Knowledge"].includes(topic) ? "General" : "Technical",
-  topic, difficulty, prompt, options, answer, explain, bn
+  topic, difficulty, prompt, options, answer, explain, bn,
+  sourceKind: index >= authoredCount || (index >= originalCount && index < existingCount) ? "Numerical drill variant" : "Original concept/scenario"
 }));
 
 export const writtenQuestions = [

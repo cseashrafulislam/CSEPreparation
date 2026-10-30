@@ -1,21 +1,31 @@
-import { STORAGE_KEY, loadState, saveState, normalizeState, bangladeshToday, daysRemaining, jobPhase, escapeHtml as h, safeHttps, shuffle, scoreMock, validateCustomJob, dailyPracticeCount } from "./core.js";
+import { STORAGE_KEY, loadState, saveState, normalizeState, bangladeshToday, daysRemaining, jobPhase, escapeHtml as h, safeHttps, validateCustomJob, dailyPracticeCount } from "./core.js";
 import { officialJobs, JOBS_LAST_CHECKED, sourceLinks } from "./data/jobs.js";
 import { DISCOVERY_ITEMS, DISCOVERY_LAST_RUN, DISCOVERY_FEEDS_OK } from "./data/discovered.js";
 import { questions, writtenQuestions, topics } from "./data/questions.js";
+import { EXAM_TRACKS, UNITS, UNIT_BY_ID, trackTopics } from "./data/curriculum.js";
+import { LABS, LAB_KINDS } from "./data/labs.js";
+import { nextReview, dueQuestionIds, topicAnalytics, recommendedTopics, createBalancedMock, scoreWithPenalty } from "./preparation-core.js";
+
+const questionsById = new Map(questions.map(q => [q.id, q]));
+const labsById = new Map(LABS.map(lab => [lab.id, lab]));
+const topicTotals = new Map(topics.map(topic => [topic, questions.filter(q => q.topic === topic).length]));
 
 let state = loadState();
 const ui = {
   jobSearch: "", jobSector: "All", jobStatus: "All", showExpired: false,
-  practiceTopic: "All", practiceMode: "All", practiceIndex: 0,
-  writtenTopic: "All", expandedWritten: new Set(),
+  practiceTopic: "All", practiceMode: "All", practiceIndex: 0, practiceDifficulty: "All", practiceSearch: "",
+  writtenTopic: "All", writtenSearch: "", expandedWritten: new Set(),
+  academyTopic: "All", academyOpen: null,
+  labKind: "All", labLevel: "All", labSearch: "", labId: LABS[0]?.id, labHint: false, labSolution: false,
   mockReviewId: null, installPrompt: null
 };
 let timerHandle = null;
 let toastHandle = null;
-const routes = new Set(["dashboard", "circulars", "practice", "written", "syllabus", "mock", "notes"]);
+const routes = new Set(["dashboard", "circulars", "academy", "practice", "lab", "written", "syllabus", "mock", "analytics", "notes"]);
 const routeNames = {
   dashboard: "ড্যাশবোর্ড", circulars: "চাকরির সার্কুলার", practice: "MCQ প্র্যাকটিস",
-  written: "Written প্রস্তুতি", syllabus: "BUET রোডম্যাপ", mock: "মডেল টেস্ট", notes: "নোট ও ব্যাকআপ"
+  academy: "বিষয়ভিত্তিক পড়াশোনা", lab: "Coding & SQL Lab", analytics: "অগ্রগতি ও দুর্বলতা",
+  written: "Written প্রস্তুতি", syllabus: "পরীক্ষার রোডম্যাপ", mock: "মডেল টেস্ট", notes: "নোট ও ব্যাকআপ"
 };
 const byId = id => document.getElementById(id);
 const labelDate = iso => new Intl.DateTimeFormat("bn-BD", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Dhaka" }).format(new Date(`${iso}T00:00:00Z`));
@@ -89,14 +99,14 @@ function miniJob(job) {
 
 function renderDashboard() {
   const today = bangladeshToday();
-  const answered = Object.entries(state.answers).filter(([key]) => questions.some(q => q.id === key));
+  const answered = Object.entries(state.answers).filter(([key]) => questionsById.has(key));
   const right = answered.filter(([, a]) => a.correct).length;
-  const todayCount = dailyPracticeCount(state.answers, today);
+  const todayCount = dailyPracticeCount(state.answers, today, state.activity);
   const pending = allJobs().filter(job => ["open", "urgent"].includes(jobPhase(job, today)));
   const upcoming = [...pending].sort((a, b) => a.deadline.localeCompare(b.deadline)).slice(0, 4);
   const target = Math.min(100, Math.round(todayCount / state.dailyGoal * 100));
   const topicProgress = topics.filter(t => !["Bangla", "English", "General Knowledge", "Mathematics"].includes(t)).slice(0, 5).map(t => {
-    const total = questions.filter(q => q.topic === t).length;
+    const total = topicTotals.get(t);
     const done = questions.filter(q => q.topic === t && state.answers[q.id]).length;
     return `<div class="topic-row"><div class="topic-name"><strong>${h(t)}</strong><span>${done}/${total}</span></div><div class="progress-track"><div class="progress-fill" style="width:${percent(done, total)}%"></div></div></div>`;
   }).join("");
@@ -105,15 +115,15 @@ function renderDashboard() {
       '<button class="button soft" data-action="backup">↧ Backup My Data</button>')}
     <section class="hero">
       <div><small>YOUR NEXT MILESTONE · GOVT CSE</small><h2>পরিকল্পিত প্রস্তুতিতেই<br><em>সফলতার শুরু।</em></h2>
-      <p>BUET-ধাঁচের টেকনিক্যাল প্রশ্ন, সাধারণ অংশ এবং সময় ধরে পরীক্ষা—প্রতিদিন অল্প অল্প করে এগিয়ে চলুন।</p>
-      <div class="hero-actions"><button class="button primary" data-action="goto" data-target="practice">প্র্যাকটিস শুরু করুন →</button><button class="button ghost" data-action="goto" data-target="mock">মডেল টেস্ট দিন ◷</button></div></div>
+      <p>ভিত্তি তৈরি → হাতে-কলমে Coding/SQL → Written practice → সময় ধরে পরীক্ষা → ভুলগুলো পুনরায় রিভিশন।</p>
+      <div class="hero-actions"><button class="button primary" data-action="goto" data-target="academy">পড়াশোনা শুরু করুন →</button><button class="button ghost" data-action="goto" data-target="mock">মডেল টেস্ট দিন ◷</button></div></div>
       <div class="hero-illustration" aria-hidden="true"><div class="code-tile"><span>function <b>success</b>() {</span><br><span> &nbsp;<i>practice</i>.daily();</span><br><span> &nbsp;return <b>career</b>;</span><br><span>}</span></div></div>
     </section>
     <div class="stats-grid">
-      ${stat("প্রশ্নব্যাংক", questions.length, "▦", `${topics.length}টি বিষয় • MCQ`)}
+      ${stat("MCQ অনুশীলন", questions.length, "▦", `${questions.filter(q => q.sourceKind === "Original concept/scenario").length} original + ${questions.filter(q => q.sourceKind === "Numerical drill variant").length} drill variants`)}
       ${stat("আজ প্র্যাকটিস", todayCount, "✎", `দৈনিক লক্ষ্য ${state.dailyGoal}টি`, "green")}
-      ${stat("সঠিক উত্তর", `${percent(right, answered.length)}%`, "◎", `${right}/${answered.length}টি উত্তর সঠিক`, "purple")}
-      ${stat("চলমান সার্কুলার", pending.length, "▤", "অফিশিয়াল উৎসের লিংক", "orange")}
+      ${stat("সঠিক উত্তর", answered.length ? `${percent(right, answered.length)}%` : "—", "◎", `${right}/${answered.length}টি উত্তর সঠিক`, "purple")}
+      ${stat("Practical Lab", `${Object.values(state.labResults).filter(r => r === "solved").length}/${LABS.length}`, "⌘", "Coding · SQL · Analytical", "orange")}
     </div>
     <div class="dashboard-grid">
       <div class="stack">
@@ -121,6 +131,10 @@ function renderDashboard() {
           ${upcoming.length ? upcoming.map(miniJob).join("") : '<p class="muted">এই মুহূর্তে তালিকায় সক্রিয় সার্কুলার নেই। অফিশিয়াল উৎসে নতুন বিজ্ঞপ্তি দেখুন।</p>'}
         </section>
         <section class="panel"><div class="panel-header"><div><h3>বিষয়ভিত্তিক অগ্রগতি</h3><p class="panel-subtitle">MCQ-তে কোন বিষয় কতদূর</p></div><a class="link-action" href="#practice">প্র্যাকটিস →</a></div>${topicProgress}</section>
+        <section class="panel"><div class="panel-header"><div><h3>পরীক্ষার সিলেবাস</h3><p class="panel-subtitle">${state.unitDone.length}/${UNITS.length}টি Study Unit সম্পন্ন</p></div><a class="link-action" href="#academy">সব Unit →</a></div>
+          <div class="progress-track"><div class="progress-fill" style="width:${percent(state.unitDone.length, UNITS.length)}%"></div></div>
+          <p class="side-tip mt">পদভেদে সিলেবাস বদলায়। আপনার পছন্দের ট্র্যাক: <strong>${h(EXAM_TRACKS.find(t => t.id === state.trackId)?.title || "সমন্বিত CSE/IT")}</strong>।</p>
+        </section>
       </div>
       <div class="stack">
         <section class="panel"><div class="panel-header"><div><h3>আজকের লক্ষ্য</h3><p class="panel-subtitle">নিয়মিত প্র্যাকটিসই আপনার শক্তি</p></div></div>
@@ -128,11 +142,12 @@ function renderDashboard() {
           <div class="progress-track"><div class="progress-fill" style="width:${target}%"></div></div><button class="button soft full mt" data-action="goto" data-target="practice">Continue Learning →</button>
         </section>
         <section class="panel"><div class="panel-header"><div><h3>পরের প্রস্তুতি</h3><p class="panel-subtitle">সহজ ৩-ধাপের রুটিন</p></div></div>
-          <div class="topic-chip">① Topic-wise MCQ <span>১৫ মিনিট</span></div>
-          <div class="topic-chip">② Technical written <span>২০ মিনিট</span></div>
-          <div class="topic-chip">③ Timed mock test <span>২৫ মিনিট</span></div>
+          <div class="topic-chip">① Topic study + MCQ <span>৪৫ মিনিট</span></div>
+          <div class="topic-chip">② Coding/SQL + Written <span>৪৫ মিনিট</span></div>
+          <div class="topic-chip">③ Timed mock + ভুল রিভিশন <span>৩০ মিনিট</span></div>
           <button class="button full mt" data-action="goto" data-target="syllabus">পুরো Study Roadmap →</button>
         </section>
+        <section class="panel"><h3>পুনরায় রিভিশন</h3><p class="side-tip mt">আজ রিভিশনের সময় হয়েছে <strong>${dueQuestionIds(questions, state.reviewSchedule, today).size}টি</strong> প্রশ্নের। ভুল উত্তর আবার দিন এবং ধাপে ধাপে interval বাড়ান।</p><button class="button soft full mt" data-action="review-due">Due Questions →</button></section>
         <section class="panel"><span class="badge">Daily discovery</span><p class="side-tip mt">প্রতিদিন নতুন IT/CSE নিয়োগের সম্ভাব্য লিংক খোঁজার অটোমেশন রয়েছে। <strong>${DISCOVERY_ITEMS.length}টি</strong> লিংক পাওয়া গেছে। শেষ সফল পরীক্ষা: <strong>${DISCOVERY_LAST_RUN ? labelDate(DISCOVERY_LAST_RUN.slice(0, 10)) : "প্রথম রান অপেক্ষমাণ"}</strong>। এগুলো অফিশিয়াল বিজ্ঞপ্তি হিসেবে যাচাই করা নয়।</p><button class="button soft full mt" data-action="goto" data-target="circulars">নতুন খোঁজ দেখুন →</button></section>
       </div>
     </div>`;
@@ -192,13 +207,74 @@ function renderCirculars() {
     </aside></div>`;
 }
 
+function renderAcademy() {
+  const focus = new Set(trackTopics(state.trackId));
+  const visible = UNITS.filter(unit => ui.academyTopic === "All" ? focus.has(unit.topic) : unit.topic === ui.academyTopic);
+  const complete = visible.filter(unit => state.unitDone.includes(unit.id)).length;
+  return `${section("CSE / IT Study Academy", "শুধু প্রশ্ন মুখস্থ নয়—সিলেবাস, সূত্র, সমস্যা সমাধান এবং পরীক্ষায় ভুল হওয়ার জায়গাগুলো ধরে পড়ুন.",
+    '<button class="button primary" data-action="goto" data-target="lab">Coding & SQL Lab →</button>')}
+    <div class="info-banner"><b>ⓘ</b><p>এটি CSE চাকরির প্রস্তুতির জন্য নিজস্ব Study Outline, BUET বা কোনো নিয়োগকারীর অফিসিয়াল সিলেবাস নয়। মূল বিজ্ঞপ্তির সিলেবাসকে সর্বোচ্চ অগ্রাধিকার দিন।</p></div>
+    <div class="toolbar"><label class="form-field"><span class="subtle">আপনার প্রস্তুতির ধরন</span><select id="track-select" class="select">${EXAM_TRACKS.map(track => `<option value="${track.id}"${state.trackId === track.id ? " selected" : ""}>${h(track.title)}</option>`).join("")}</select></label>
+      <label class="form-field"><span class="subtle">বিষয়</span><select id="academy-topic" class="select"><option value="All">এই ট্র্যাকের সব বিষয়</option>${[...new Set(UNITS.map(u => u.topic))].map(topic => `<option value="${h(topic)}"${ui.academyTopic === topic ? " selected" : ""}>${h(topic)}</option>`).join("")}</select></label>
+      <span class="badge">${complete}/${visible.length} Unit সম্পন্ন</span>
+    </div>
+    <div class="unit-grid">${visible.map(unit => `<article class="unit-card ${state.unitDone.includes(unit.id) ? "done" : ""}">
+      <div class="unit-header"><span class="badge">${h(unit.topic)}</span><span class="subtle">${state.unitDone.includes(unit.id) ? "✓ সম্পন্ন" : "পড়ার বাকি"}</span></div>
+      <h3>${h(unit.title)}</h3><p>${h(unit.concept)}</p>
+      ${ui.academyOpen === unit.id ? `<div class="unit-detail"><h4>যা শিখতে হবে</h4><ul>${unit.checklist.map(item => `<li>${h(item)}</li>`).join("")}</ul>
+        <p><strong>সাধারণ ভুল:</strong> ${h(unit.pitfalls)}</p><p><strong>লিখে অনুশীলন:</strong> ${h(unit.exercise)}</p></div>` : ""}
+      <div class="unit-actions"><button class="button small" data-action="unit-open" data-id="${unit.id}">${ui.academyOpen === unit.id ? "সংক্ষিপ্ত করুন −" : "বিস্তারিত পড়ুন +"}</button>
+        <button class="button small ${state.unitDone.includes(unit.id) ? "selected" : ""}" data-action="unit-done" data-id="${unit.id}">${state.unitDone.includes(unit.id) ? "✓ Completed" : "✓ Mark studied"}</button>
+        <button class="button small soft" data-action="practice-topic" data-topic="${h(unit.topic)}">MCQ →</button></div>
+    </article>`).join("") || '<div class="empty">এই ফিল্টারে কোনো Unit নেই।</div>'}</div>`;
+}
+
+function filteredLabs() {
+  const query = ui.labSearch.trim().toLocaleLowerCase();
+  return LABS.filter(lab =>
+    (ui.labKind === "All" || ui.labKind === lab.kind) &&
+    (ui.labLevel === "All" || ui.labLevel === lab.difficulty) &&
+    (!query || `${lab.title} ${lab.topic} ${lab.prompt}`.toLocaleLowerCase().includes(query))
+  );
+}
+
+function renderLab() {
+  const filtered = filteredLabs();
+  if (!filtered.some(lab => lab.id === ui.labId)) ui.labId = filtered[0]?.id || null;
+  const lab = labsById.get(ui.labId);
+  const done = LABS.filter(item => state.labResults[item.id] === "solved").length;
+  return `${section("Coding, SQL & Analytical Lab", "বাস্তব সমস্যা সমাধান লিখে অনুশীলন করুন। উত্তর নিজের browser-এ থাকবে; এখানে code execute বা auto-grade করা হয় না।")}
+    <div class="stats-grid compact-stats">${stat("মোট Lab", LABS.length, "⌘", "Original problems")}${stat("Solved", done, "✓", "Self-assessed", "green")}${stat("Revision needed", Object.values(state.labResults).filter(v => v === "retry").length, "↻", "Reattempt these", "orange")}${stat("Draft saved", Object.values(state.labDrafts).filter(Boolean).length, "▧", "Browser-local", "purple")}</div>
+    <div class="toolbar"><label class="search-box"><input class="input" id="lab-search" type="search" placeholder="Problem, topic বা keyword..." value="${h(ui.labSearch)}" aria-label="Search exercises"></label>
+      <select class="select" id="lab-kind"><option value="All">সব ধরনের সমস্যা</option>${LAB_KINDS.map(kind => `<option value="${kind}"${ui.labKind === kind ? " selected" : ""}>${kind}</option>`).join("")}</select>
+      <select class="select" id="lab-level"><option value="All">সব difficulty</option>${["Medium", "Hard"].map(level => `<option value="${level}"${ui.labLevel === level ? " selected" : ""}>${level}</option>`).join("")}</select>
+      <span class="badge">${filtered.length} problems</span></div>
+    ${lab ? `<div class="lab-layout"><aside class="panel lab-picker"><div class="panel-header"><h3>Problem list</h3><span class="subtle">${filtered.length}টি</span></div>
+      <div class="lab-list">${filtered.map((item, index) => `<button class="lab-list-item ${item.id === lab.id ? "active" : ""}" data-action="lab-open" data-id="${item.id}"><span class="lab-index">${index + 1}</span><span><strong>${h(item.title)}</strong><small>${h(item.kind)} · ${h(item.difficulty)}</small></span><span>${state.labResults[item.id] === "solved" ? "✓" : state.labResults[item.id] === "retry" ? "↻" : ""}</span></button>`).join("")}</div></aside>
+      <article class="panel lab-work"><div class="question-top"><span class="badge">${h(lab.kind)} · ${h(lab.topic)} · ${h(lab.difficulty)}</span><span class="subtle">${h(lab.id)}</span></div>
+        <h2>${h(lab.title)}</h2><p class="lab-prompt">${h(lab.prompt)}</p>
+        <div class="lab-toolrow"><button class="button small" data-action="lab-hint">${ui.labHint ? "Hide hint −" : "Get hint +"}</button><button class="button small" data-action="lab-solution">${ui.labSolution ? "Hide reference −" : "Show reference solution +"}</button></div>
+        ${ui.labHint ? `<div class="hint-box"><strong>Hint</strong><p>${h(lab.hint)}</p></div>` : ""}
+        <form id="lab-form" data-lab-id="${lab.id}"><label class="form-field"><strong>নিজের সমাধান / code / SQL</strong><textarea class="textarea code-entry" name="solution" maxlength="10000" placeholder="এখানে নিজে সমাধান লিখুন। Save Draft চাপলে এই device-এ সংরক্ষণ হবে...">${h(state.labDrafts[lab.id] || "")}</textarea></label>
+          <div class="heading-actions mt"><button class="button primary" type="submit">Save Draft</button><small class="muted">Auto grading নেই · local save</small></div></form>
+        ${ui.labSolution ? `<section class="reference-answer"><h3>Reference solution</h3><pre>${h(lab.solution)}</pre><strong>নিজে যাচাই করুন</strong><ul>${lab.rubric.map(r => `<li>${h(r)}</li>`).join("")}</ul><p><strong>Edge cases:</strong> ${h(lab.check)}</p></section>` : ""}
+        <div class="lab-assessment"><strong>নিজের সমাধান যাচাই করে মূল্যায়ন</strong><div class="heading-actions mt"><button class="button small ${state.labResults[lab.id] === "solved" ? "selected" : ""}" data-action="lab-rate" data-id="${lab.id}" data-rating="solved">✓ Solved</button><button class="button small ${state.labResults[lab.id] === "retry" ? "selected" : ""}" data-action="lab-rate" data-id="${lab.id}" data-rating="retry">↻ Needs revision</button></div></div>
+      </article></div>` : '<div class="empty"><strong>এই ফিল্টারে কোনো সমস্যা নেই</strong><p>Filter বদলে আবার দেখুন।</p></div>'}`;
+}
+
 function filteredQuestions() {
+  const today = bangladeshToday();
+  const due = ui.practiceMode === "Due" ? dueQuestionIds(questions, state.reviewSchedule, today) : null;
+  const search = ui.practiceSearch.trim().toLocaleLowerCase();
   return questions.filter(q => {
     if (ui.practiceTopic !== "All" && q.topic !== ui.practiceTopic) return false;
+    if (ui.practiceDifficulty !== "All" && q.difficulty !== ui.practiceDifficulty) return false;
+    if (search && !`${q.topic} ${q.prompt}`.toLocaleLowerCase().includes(search)) return false;
     const answer = state.answers[q.id];
     if (ui.practiceMode === "Unanswered") return !answer;
     if (ui.practiceMode === "Wrong") return Boolean(answer && !answer.correct);
     if (ui.practiceMode === "Bookmarked") return state.bookmarks.includes(q.id);
+    if (ui.practiceMode === "Due") return due.has(q.id);
     return true;
   });
 }
@@ -208,11 +284,12 @@ function renderPractice() {
   ui.practiceIndex = Math.min(Math.max(ui.practiceIndex, 0), Math.max(0, list.length - 1));
   const q = list[ui.practiceIndex];
   const answer = q ? state.answers[q.id] : null;
-  const head = section("Topic-wise MCQ Practice", "BUET-ধাঁচের প্রস্তুতি: টেকনিক্যাল + বাংলা, ইংরেজি, গণিত, সাধারণ জ্ঞান।",
+  const head = section("Topic-wise MCQ Practice", "Concept, calculation এবং ট্র্যাকভিত্তিক অনুশীলন; প্রস্তুতিমূলক প্রশ্ন, অফিসিয়াল বিগত প্রশ্ন নয়।",
     '<button class="button" data-action="goto" data-target="mock">◷ Timed Mock Test</button>');
-  const toolbar = `<div class="toolbar">
+  const toolbar = `<div class="toolbar"><label class="search-box"><input class="input" type="search" id="practice-search" placeholder="প্রশ্ন খুঁজুন..." aria-label="Search questions" value="${h(ui.practiceSearch)}"></label>
     <select class="select" id="practice-topic" aria-label="প্রশ্নের বিষয়"><option value="All">সব বিষয়</option>${topics.map(t => `<option value="${h(t)}"${ui.practiceTopic === t ? " selected" : ""}>${h(t)}</option>`).join("")}</select>
-    <select class="select" id="practice-mode" aria-label="প্রশ্নের ধরন"><option value="All">সব প্রশ্ন</option><option value="Unanswered"${ui.practiceMode === "Unanswered" ? " selected" : ""}>Unanswered</option><option value="Wrong"${ui.practiceMode === "Wrong" ? " selected" : ""}>Wrong answers</option><option value="Bookmarked"${ui.practiceMode === "Bookmarked" ? " selected" : ""}>Bookmarked</option></select>
+    <select class="select" id="practice-difficulty" aria-label="Difficulty"><option value="All">সব লেভেল</option>${["Easy", "Medium", "Hard"].map(level => `<option value="${level}"${ui.practiceDifficulty === level ? " selected" : ""}>${level}</option>`).join("")}</select>
+    <select class="select" id="practice-mode" aria-label="প্রশ্নের ধরন"><option value="All">সব প্রশ্ন</option><option value="Unanswered"${ui.practiceMode === "Unanswered" ? " selected" : ""}>Unanswered</option><option value="Wrong"${ui.practiceMode === "Wrong" ? " selected" : ""}>Wrong answers</option><option value="Due"${ui.practiceMode === "Due" ? " selected" : ""}>Due for revision</option><option value="Bookmarked"${ui.practiceMode === "Bookmarked" ? " selected" : ""}>Bookmarked</option></select>
     <span class="badge">${list.length} questions</span>
   </div>`;
   if (!q) return `${head}${toolbar}<div class="empty"><div class="empty-icon">✓</div><strong>এই ফিল্টারে কোনো প্রশ্ন নেই</strong><p>ভিন্ন topic বা filter বেছে নিন।</p><button class="button primary" data-action="clear-practice-filter">সব প্রশ্ন দেখুন</button></div>`;
@@ -228,58 +305,102 @@ function renderPractice() {
     return `<div class="topic-chip ${q.topic === t ? "active" : ""}"><span>${h(t)}</span><span>${answered}/${total}</span></div>`;
   }).join("");
   return `${head}${toolbar}<div class="learning-layout"><div>
-    <article class="question-card"><div class="question-top"><span class="badge">${h(q.topic)} · ${h(q.difficulty)}</span><button class="button small ${state.bookmarks.includes(q.id) ? "selected" : ""}" data-action="bookmark" data-id="${q.id}">${state.bookmarks.includes(q.id) ? "★ Saved" : "☆ Bookmark"}</button></div>
+    <article class="question-card"><div class="question-top"><span class="badge">${h(q.topic)} · ${h(q.difficulty)} · ${q.sourceKind === "Numerical drill variant" ? "Drill variant" : "Original question"}</span><button class="button small ${state.bookmarks.includes(q.id) ? "selected" : ""}" data-action="bookmark" data-id="${q.id}">${state.bookmarks.includes(q.id) ? "★ Saved" : "☆ Bookmark"}</button></div>
     <h2>${h(q.prompt)}</h2><div class="options">${options}</div>${explanation}
     <div class="question-bottom"><span class="counter">প্রশ্ন ${ui.practiceIndex + 1} / ${list.length}</span><div class="heading-actions">${answer ? `<button class="button small" data-action="retry" data-id="${q.id}">↺ Retry</button>` : ""}
     <button class="button small" data-action="practice-prev"${ui.practiceIndex === 0 ? " disabled" : ""}>← Previous</button>
     <button class="button primary small" data-action="practice-next"${ui.practiceIndex === list.length - 1 ? " disabled" : ""}>Next →</button></div></div>
     </article></div><aside class="stack"><section class="panel"><div class="panel-header"><div><h3>Study Progress</h3><p class="panel-subtitle">বিষয়ভিত্তিক সমাধান</p></div></div>${sidebar}</section>
-    <section class="panel"><h3>মনে রাখুন</h3><p class="side-tip mt">প্রথমে উত্তর দিন, তারপর ইংরেজি explanation ও বাংলা ব্যাখ্যা পড়ুন। ভুল প্রশ্নগুলো “Wrong answers” থেকে আবার চর্চা করুন।</p></section></aside></div>`;
+    <section class="panel"><h3>মনে রাখুন</h3><p class="side-tip mt">প্রথমে নিজে উত্তর দিন। Correct/Wrong অনুযায়ী ১, ৩, ৭, ১৪, ৩০ দিনের পুনরাবৃত্তির সময়সূচি তৈরি হবে। গণনাভিত্তিক ভ্যারিয়েন্টকে আলাদা ধারণা হিসেবে গণ্য করবেন না।</p></section></aside></div>`;
 }
 
 function renderWritten() {
-  const list = writtenQuestions.filter(q => ui.writtenTopic === "All" || q.topic === ui.writtenTopic);
-  return `${section("Technical & General Written", "ধারণা, অ্যালগরিদম, SQL, Networking ও বিগত পরীক্ষার ধরন অনুযায়ী অনুশীলন।")}
+  const search = ui.writtenSearch.trim().toLocaleLowerCase();
+  const list = writtenQuestions.filter(q => (ui.writtenTopic === "All" || q.topic === ui.writtenTopic) && (!search || `${q.topic} ${q.prompt}`.toLocaleLowerCase().includes(search)));
+  return `${section("Technical & General Written", "প্রথমে সময় ধরে নিজের উত্তর লিখুন; পরে reference answer মিলিয়ে self-assess করুন।")}
     <div class="info-banner"><b>✎</b><p>এগুলো নিজস্ব প্রস্তুতিমূলক প্রশ্ন ও নমুনা উত্তর; কোনো প্রতিষ্ঠানের আসল বা ফাঁস হওয়া প্রশ্নপত্র নয়।</p></div>
-    <div class="toolbar"><select class="select" id="written-topic" aria-label="Written subject"><option value="All">সব বিষয়</option>${[...new Set(writtenQuestions.map(q => q.topic))].map(t => `<option value="${h(t)}"${ui.writtenTopic === t ? " selected" : ""}>${h(t)}</option>`).join("")}</select><span class="badge">${state.writtenDone.length}/${writtenQuestions.length}টি পড়া হয়েছে</span></div>
+    <div class="toolbar"><label class="search-box"><input class="input" id="written-search" type="search" placeholder="Written প্রশ্ন খুঁজুন..." value="${h(ui.writtenSearch)}" aria-label="Search written"></label><select class="select" id="written-topic" aria-label="Written subject"><option value="All">সব বিষয়</option>${[...new Set(writtenQuestions.map(q => q.topic))].map(t => `<option value="${h(t)}"${ui.writtenTopic === t ? " selected" : ""}>${h(t)}</option>`).join("")}</select><span class="badge">${state.writtenDone.length}/${writtenQuestions.length}টি পড়া হয়েছে</span></div>
     <div class="written-list">${list.map(q => `<article class="written-item"><div class="written-head"><div><span>${h(q.topic)} · ${h(q.id.toUpperCase())}</span><strong>${h(q.prompt)}</strong></div><div class="written-actions">
       <button class="button small ${state.writtenDone.includes(q.id) ? "selected" : ""}" data-action="written-done" data-id="${q.id}">${state.writtenDone.includes(q.id) ? "✓ Studied" : "Mark studied"}</button>
-      <button class="button small" data-action="written-toggle" data-id="${q.id}">${ui.expandedWritten.has(q.id) ? "Hide answer −" : "Show answer +"}</button>
-    </div></div>${ui.expandedWritten.has(q.id) ? `<div class="written-answer"><strong>Sample answer</strong><p>${h(q.answer)}</p><small>${h(q.bn)}</small></div>` : ""}</article>`).join("")}</div>`;
+      <button class="button small" data-action="written-toggle" data-id="${q.id}">${ui.expandedWritten.has(q.id) ? "Close −" : "Write & Review +"}</button>
+    </div></div>${ui.expandedWritten.has(q.id) ? `<div class="written-answer">
+      <form class="written-form" data-written-id="${q.id}"><label class="form-field"><strong>নিজের উত্তর (সময় ধরে লিখুন)</strong><textarea class="textarea code-entry" name="draft" maxlength="10000" placeholder="নিজের ভাষায় উত্তর লিখুন...">${h(state.writtenDrafts[q.id] || "")}</textarea></label><button class="button small primary mt" type="submit">Save answer</button></form>
+      <details class="reference-answer mt"><summary>Reference answer মিলিয়ে দেখুন</summary><p>${h(q.answer)}</p><small>${h(q.bn)}</small></details>
+      <div class="lab-assessment"><strong>Self assessment:</strong><div class="heading-actions mt"><button class="button small ${state.writtenResults[q.id] === "solved" ? "selected" : ""}" data-action="written-rate" data-id="${q.id}" data-rating="solved">✓ Satisfactory</button><button class="button small ${state.writtenResults[q.id] === "retry" ? "selected" : ""}" data-action="written-rate" data-id="${q.id}" data-rating="retry">↻ Rewrite needed</button></div></div></div>` : ""}</article>`).join("") || '<div class="empty">এই ফিল্টারে কোনো Written প্রশ্ন নেই।</div>'}</div>`;
 }
 
 function renderSyllabus() {
   const weeks = [
-    { no: "01", name: "Core CSE Foundation", description: "Data Structures, Algorithms, DBMS/SQL, Operating System", tasks: ["প্রতিদিন ১৫–২০টি Technical MCQ", "Binary search, sorting, tree, SQL GROUP BY/HAVING লিখে অনুশীলন", "Deadlock, scheduling, transaction ACID সংক্ষেপে লিখুন"] },
-    { no: "02", name: "Engineering & Programming", description: "Networking, OOP/C#, Programming, Security, Testing", tasks: ["TCP/UDP, subnetting ও OSI অনুশীলন", "C/C#/Java fundamentals এবং ছোট code trace", "OOP, REST API, testing, security questions"] },
-    { no: "03", name: "General Exam Sections", description: "Math, English, Bangla, General Knowledge", tasks: ["প্রতিদিন Math + English MCQ", "বাংলা ব্যাকরণ ও জাতীয়-আন্তর্জাতিক সাধারণ জ্ঞান", "নতুন সার্কুলারের PDF দেখে পরীক্ষার সিলেবাস আপডেট"] },
-    { no: "04", name: "Exam Simulation & Review", description: "Timed mock, technical written, weak-topic revision", tasks: ["অন্তত ৪টি timed mock দিন", "Wrong answers ফিল্টার থেকে দুর্বল প্রশ্নগুলো দেখুন", "Written-এ ১৬টি sample answer নিজের ভাষায় লিখুন"] },
+    { no: "01", name: "Foundation I — DSA & Programming", description: "Data Structures, Algorithms, Programming", tasks: ["Array, linked list, stack, queue, tree ও complexity", "প্রতিদিন ৩০–৫০টি MCQ (ভুলগুলো নোট করুন)", "প্রতিদিন ১টি Coding Lab + ১টি Written"] },
+    { no: "02", name: "Foundation II — SQL & Operating System", description: "DBMS & SQL, Operating System", tasks: ["JOIN, GROUP BY, window function, normalization", "Scheduling, deadlock, virtual memory, paging", "প্রতি দুই দিনে ১টি ৫০ প্রশ্নের timed mock"] },
+    { no: "03", name: "Computer Systems", description: "Networking, Digital Logic, Architecture", tasks: ["IPv4 subnetting/VLSM, TCP/IP, DNS", "Boolean algebra, K-map, pipeline, cache", "সপ্তাহ শেষে দুটি ৬০-মিনিট মক পরীক্ষা"] },
+    { no: "04", name: "Theory & Software Design", description: "Compiler, Automata, OOP, Security, SE", tasks: ["FIRST/FOLLOW, DFA/NFA, DP/greedy", "OOP, SOLID, HTTP, security & testing", "প্রতিদিন ১টি analytical written + ১টি practical"] },
+    { no: "05", name: "General Preparation I", description: "Mathematics, English, Bangla", tasks: ["Percentage, ratio, probability, reasoning", "Grammar, vocab, reading, বাংলা ব্যাকরণ", "Technical revision ও আগের ভুলগুলো পুনরায় সমাধান"] },
+    { no: "06", name: "General Preparation II + Current Affairs", description: "GK, writing skills, quantitative speed", tasks: ["বাংলাদেশ, সংবিধান, আন্তর্জাতিক সংস্থা", "পরিবর্তনশীল GK তথ্য বর্তমান নির্ভরযোগ্য সূত্রে যাচাই", "Time-bound math এবং ছোট রচনামূলক উত্তর"] },
+    { no: "07", name: "Exam-level Problem Solving", description: "Hard DSA, OS numericals, SQL, networks", tasks: ["Hard MCQ ও Practical Lab-এর বেশি সময় দিন", "প্রতিদিন ২টি Written উত্তর সময় বেঁধে লিখুন", "ভুল topic অনুযায়ী revision + ৩টি পূর্ণ মক"] },
+    { no: "08", name: "Final Revision & Simulation", description: "Full mocks, previous paper analysis, weak topics", tasks: ["যাচাই করা বিগত প্রশ্ন দিয়ে হাতে লিখে অনুশীলন", "নিজের নিয়োগ বিজ্ঞপ্তির সিলেবাস অনুযায়ী mock settings", "সময়, ভুল ও প্রশ্ন বাছাইয়ের কৌশল পর্যালোচনা"] },
   ];
-  return `${section("BUET-style Exam Roadmap", "Petrobangla ও অন্যান্য CSE/IT নিয়োগ পরীক্ষার জন্য চার সপ্তাহের বাস্তবসম্মত প্রস্তুতি।",
+  const track = EXAM_TRACKS.find(t => t.id === state.trackId) || EXAM_TRACKS[0];
+  const relevantUnits = UNITS.filter(unit => track.focus.includes(unit.topic));
+  const studied = relevantUnits.filter(unit => state.unitDone.includes(unit.id)).length;
+  return `${section("Job Preparation Roadmap", "আট সপ্তাহের সাজানো রুটিন—বিজ্ঞপ্তির সিলেবাস, আপনার দুর্বলতা ও সময় অনুযায়ী বদলাতে পারবেন।",
     '<button class="button primary" data-action="goto" data-target="mock">মডেল টেস্ট →</button>')}
-    <div class="info-banner"><b>ⓘ</b><p>এখানে দেওয়া বিভাজনটি পূর্বের একটি CSE নিয়োগ পরীক্ষার প্রশ্নের ভিত্তিতে অনুশীলনের নির্দেশনা। <strong>২০২৬ সালের নিয়োগ পরীক্ষার নিশ্চিত নম্বরবণ্টন নয়।</strong> কর্তৃপক্ষ বা পরীক্ষার দায়িত্বপ্রাপ্ত প্রতিষ্ঠান বদলাতে পারে।</p></div>
+    <div class="info-banner"><b>ⓘ</b><p><strong>একই BUET pattern সব নিয়োগে চলে না।</strong> কর্তৃপক্ষ, পদ ও বছরভেদে MCQ/Written/Practical, নম্বরবণ্টন ও negative marking বদলায়। এখানে কোনো নির্দিষ্ট নম্বরবণ্টনকে নিশ্চিত বলা হচ্ছে না। নিয়োগের মূল বিজ্ঞপ্তি দেখে Mock সেটিং মিলিয়ে নিন।</p></div>
+    <div class="toolbar"><label class="form-field"><span class="subtle">Target examination</span><select id="track-select" class="select">${EXAM_TRACKS.map(t => `<option value="${t.id}"${state.trackId === t.id ? " selected" : ""}>${h(t.title)}</option>`).join("")}</select></label><span class="badge">${studied}/${relevantUnits.length} Study Units studied</span></div>
+    <p class="side-tip">${h(track.description)}</p>
     <div class="stats-grid">
-      ${stat("General practice", "40", "▧", "ঐতিহাসিক নমুনায় MCQ সংখ্যা")}
-      ${stat("General marks", "60", "✓", "পুরোনো প্রশ্নপত্রে মোট নম্বর", "green")}
-      ${stat("Technical marks", "40", "⌘", "পুরোনো নমুনায় Written", "purple")}
-      ${stat("4-week plan", "28", "◷", "দিনের প্রস্তুতি রুটিন", "orange")}
+      ${stat("Study units", relevantUnits.length, "▣", "Track-specific syllabus")}
+      ${stat("Practical Labs", LABS.length, "⌘", "Coding / SQL / Analytical", "green")}
+      ${stat("Written tasks", writtenQuestions.length, "✎", "Explain & self-assess", "purple")}
+      ${stat("8-week plan", "56", "◷", "দিনের প্রস্তুতি রুটিন", "orange")}
     </div>
     <div class="section-grid">
       <div class="stack">
-        <section class="panel"><div class="panel-header"><div><h3>আপনার ৪ সপ্তাহের পরিকল্পনা</h3><p class="panel-subtitle">Software engineering experience কাজে লাগিয়ে পরীক্ষাভিত্তিক রিভিশন</p></div></div>
+        <section class="panel"><div class="panel-header"><div><h3>আপনার ৮ সপ্তাহের পরিকল্পনা</h3><p class="panel-subtitle">৪৫ মিনিট theory, ৪৫ মিনিট MCQ, ৩০ মিনিট coding/written, ১৫ মিনিট review—নিজের সময়মতো সামঞ্জস্য করুন।</p></div></div>
         ${weeks.map(w => `<div class="roadmap-week"><span class="roadmap-number">${w.no}</span><div><h3>${h(w.name)}</h3><p class="subtle">${h(w.description)}</p><ul>${w.tasks.map(t => `<li>${h(t)}</li>`).join("")}</ul></div></div>`).join("")}
         </section>
-        <section class="panel"><h3>Technical Written-এ যা লিখে অনুশীলন করবেন</h3>
-          <div class="topic-chip">Algorithms <span>Code + complexity</span></div><div class="topic-chip">DBMS <span>SQL + normalization</span></div>
-          <div class="topic-chip">Operating System <span>Process + scheduling</span></div><div class="topic-chip">Networking <span>TCP/IP + subnetting</span></div>
-          <div class="topic-chip">Software Engineering <span>OOP + testing</span></div>
-          <button class="button primary mt" data-action="goto" data-target="written">Written Practice →</button>
+        <section class="panel"><h3>এই ট্র্যাকের গুরুত্বপূর্ণ বিষয়</h3>
+          ${track.focus.map(topic => `<div class="topic-chip"><span>${h(topic)}</span><strong>${topicTotals.get(topic) || 0} MCQ</strong></div>`).join("")}
+          <button class="button primary mt" data-action="goto" data-target="academy">Study Units →</button>
         </section>
       </div>
-      <aside class="stack"><section class="panel"><h3>Previous paper reference</h3><p class="side-tip mt">Petrobangla CSE-সম্পর্কিত ২০২৪ সালের প্রশ্নের একটি তৃতীয়-পক্ষের সংগ্রহ। আগে প্রকাশিত পরীক্ষার ধরন বুঝতে ব্যবহার করুন; অফিসিয়াল সিলেবাস বা প্রশ্নের নিশ্চয়তা নয়।</p>
+      <aside class="stack"><section class="panel"><h3>Previous paper reference</h3><p class="side-tip mt">Petrobangla CSE-সম্পর্কিত ২০২৪ সালের প্রশ্নের একটি <strong>তৃতীয়-পক্ষের</strong> সংগ্রহ। উৎস ও বিষয়বস্তু নিজে মিলিয়ে নিন; এটি অফিসিয়াল প্রশ্ন বা ২০২৬ সালের পরীক্ষার প্যাটার্নের নিশ্চয়তা নয়।</p>
         <a href="https://duranta.app/storage/questionbank/1717174124.pdf" class="button full" target="_blank" rel="noopener noreferrer">2024 Question PDF ↗</a>
-      </section><section class="panel"><h3>আপনার জন্য পরামর্শ</h3><p class="side-tip mt">ASP.NET, C# ও SQL Server-এ ৪+ বছরের অভিজ্ঞতা থাকায় Practical Coding/SQL অংশে সুবিধা হতে পারে। সময় বেশি দিন DSA complexity, OS, Networking ও General অংশে।</p><button class="button soft full" data-action="goto" data-target="practice">Topic-wise MCQ →</button></section></aside>
+      </section><section class="panel"><h3>আপনার জন্য পরবর্তী কাজ</h3><p class="side-tip mt">MCQ-তে দুর্বল বিষয় দেখুন, Study Unit পড়ুন, হাতে উত্তর লিখুন এবং নিজের বিজ্ঞপ্তির নির্দিষ্ট নির্দেশনা অনুযায়ী পরীক্ষার সময়/নম্বর নির্ধারণ করুন।</p><button class="button soft full" data-action="goto" data-target="analytics">Weak Topic Analysis →</button><button class="button full mt" data-action="goto" data-target="lab">Practical Labs →</button></section></aside>
     </div>`;
+}
+
+function renderAnalytics() {
+  const today = bangladeshToday();
+  const analytics = topicAnalytics(questions, state.answers, state.reviewSchedule, today);
+  const focus = new Set(trackTopics(state.trackId));
+  const visible = analytics.filter(g => focus.has(g.topic));
+  const recommendations = recommendedTopics(analytics, state.trackId);
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(`${today}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() - (6 - i));
+    const key = date.toISOString().slice(0, 10);
+    return { date: key, count: state.activity.length ? state.activity.filter(entry => entry.date === key).length : Object.values(state.answers).filter(a => a.at?.startsWith(key)).length };
+  });
+  const maxDay = Math.max(1, ...days.map(day => day.count));
+  const covered = visible.reduce((sum, g) => sum + g.attempted, 0);
+  const total = visible.reduce((sum, g) => sum + g.total, 0);
+  const completedLabs = Object.values(state.labResults).filter(v => v === "solved").length;
+  return `${section("Preparation Analytics", "কত প্রশ্ন পড়েছেন নয়—কোথায় ভুল হচ্ছে, কতদিন আগে রিভিশন করেছেন এবং পরের কাজ কী, দেখুন।")}
+    <div class="info-banner"><b>ⓘ</b><p>এগুলো আপনার নিজের অনুশীলনের পরিসংখ্যান; <strong>চাকরি পাওয়ার সম্ভাবনা বা সরকারি পরীক্ষার আনুমানিক নম্বর নয়।</strong> নমুনা ছোট হলে accuracy কম নির্ভরযোগ্য।</p></div>
+    <div class="stats-grid">${stat("MCQ coverage", `${percent(covered, total)}%`, "▦", `${covered}/${total} ট্র্যাকের প্রশ্ন`)}
+      ${stat("Review due", dueQuestionIds(questions, state.reviewSchedule, today).size, "↻", "১/৩/৭/১৪/৩০ দিনের রিভিশন", "orange")}
+      ${stat("Lab completed", completedLabs, "⌘", `${LABS.length}টির মধ্যে self-assessed`, "green")}
+      ${stat("Written satisfactory", Object.values(state.writtenResults).filter(v => v === "solved").length, "✎", `${writtenQuestions.length}টি Written task`, "purple")}</div>
+    <div class="section-grid"><div class="stack"><section class="panel"><div class="panel-header"><h3>বিষয়ভিত্তিক বিশ্লেষণ</h3><small class="muted">Attempted · Coverage · Accuracy</small></div>
+      <div class="analytics-table"><div class="analytics-head"><strong>বিষয়</strong><span>Attempted</span><span>Coverage</span><span>Accuracy</span></div>
+      ${visible.map(group => `<div class="analytics-row"><strong>${h(group.topic)}</strong><span>${group.attempted}/${group.total}</span><span>${group.coverage}%</span><span class="${group.accuracy !== null && group.accuracy < 60 ? "bad-accuracy" : ""}">${group.accuracy === null ? "—" : `${group.accuracy}%`}</span></div>`).join("")}</div></section>
+      <section class="panel"><h3>গত ৭ দিনের অনুশীলন</h3><div class="activity-chart">${days.map(day => `<div class="activity-day"><div class="activity-bar" style="height:${Math.max(3,Math.round(day.count / maxDay * 94))}px" title="${day.count} answers"></div><small>${h(day.date.slice(5))}</small><strong>${day.count}</strong></div>`).join("")}</div></section></div>
+      <aside class="stack"><section class="panel"><h3>অগ্রাধিকার দিয়ে যা পড়বেন</h3><p class="side-tip mt">Coverage কম, accuracy কম বা রিভিশন বেশি বাকি—এসবের সমন্বয়ে সাজানো।</p>
+        ${recommendations.map((g, i) => `<div class="recommendation"><span>${i + 1}</span><div><strong>${h(g.topic)}</strong><small>Coverage ${g.coverage}% · Accuracy ${g.accuracy ?? "—"}% · Due ${g.due}</small></div><button class="button small" data-action="practice-topic" data-topic="${h(g.topic)}">Practice →</button></div>`).join("")}
+        <button class="button primary full mt" data-action="review-due">Due Revision →</button></section>
+        <section class="panel"><h3>গত মক পরীক্ষার ফল</h3>${state.attempts.length ? state.attempts.slice(0, 6).map(a => `<div class="topic-chip"><span>${h(a.at?.slice(0, 10) || "")}</span><strong>${a.percent}%</strong></div>`).join("") : '<p class="side-tip mt">এখনো মক পরীক্ষা দেওয়া হয়নি।</p>'}<button class="button full mt" data-action="goto" data-target="mock">Take Mock →</button></section>
+      </aside></div>`;
 }
 
 function mockSecondsLeft(mock = state.activeMock) {
@@ -294,13 +415,16 @@ function timeText(seconds) {
 }
 
 function startMock() {
-  const count = Number(byId("mock-count")?.value || 20);
-  const minutes = Number(byId("mock-minutes")?.value || 25);
+  const count = Number(byId("mock-count")?.value || 50);
+  const minutes = Number(byId("mock-minutes")?.value || 60);
   const focus = byId("mock-focus")?.value || "All";
-  const available = questions.filter(q => focus === "All" || q.category === focus);
+  const difficulty = byId("mock-difficulty")?.value || "All";
+  const penalty = Number(byId("mock-penalty")?.value || 0);
+  const selected = createBalancedMock(questions, { count, focus, difficulty, trackId: state.trackId });
+  if (!selected.length) { toast("এই ফিল্টারে মক পরীক্ষার প্রশ্ন নেই। ট্র্যাক বা লেভেল বদলান।"); return; }
   state.activeMock = {
-    ids: shuffle(available).slice(0, Math.min(count, available.length)).map(q => q.id),
-    answers: {}, index: 0, startedAt: Date.now(), minutes
+    ids: selected.map(q => q.id),
+    answers: {}, index: 0, startedAt: Date.now(), minutes, penalty, focus, difficulty, trackId: state.trackId
   };
   ui.mockReviewId = null;
   save();
@@ -311,11 +435,12 @@ function startMock() {
 function finishMock(expired = false) {
   const mock = state.activeMock;
   if (!mock) return;
-  const list = mock.ids.map(id => questions.find(q => q.id === id)).filter(Boolean);
-  const score = scoreMock(list, mock.answers);
+  const list = mock.ids.map(id => questionsById.get(id)).filter(Boolean);
+  const score = scoreWithPenalty(list, mock.answers, mock.penalty || 0);
   const attempt = {
     id: `attempt-${Date.now()}`, at: new Date().toISOString(),
-    ids: mock.ids, answers: mock.answers, minutes: mock.minutes,
+    ids: mock.ids, answers: mock.answers, minutes: mock.minutes, penalty: mock.penalty || 0,
+    wrong: score.wrong, skipped: score.skipped, net: score.net,
     score: score.correct, total: score.total, percent: score.percent,
     expired
   };
@@ -338,7 +463,11 @@ function renderMock() {
   }
   if (mock) {
     const index = Math.max(0, Math.min(mock.index, mock.ids.length - 1));
-    const q = questions.find(item => item.id === mock.ids[index]);
+    const q = questionsById.get(mock.ids[index]);
+    if (!q) {
+      queueMicrotask(() => { state.activeMock = null; save(); render(); toast("পুরোনো অসম্পূর্ণ মক আর উপলব্ধ নেই।"); });
+      return `${head}<div class="panel">পুরোনো মক পুনরুদ্ধার করা যাচ্ছে না। নতুন করে শুরু করুন।</div>`;
+    }
     const selected = mock.answers[q.id];
     const count = Object.keys(mock.answers).length;
     const options = q.options.map((opt, i) => `<button class="option ${selected === i ? "chosen" : ""}" data-action="mock-answer" data-index="${i}"><span class="letter">${String.fromCharCode(65 + i)}</span><span>${h(opt)}</span></button>`).join("");
@@ -349,22 +478,25 @@ function renderMock() {
   }
   const selectedAttempt = state.attempts.find(a => a.id === ui.mockReviewId);
   if (selectedAttempt) {
-    const review = selectedAttempt.ids.map(id => questions.find(q => q.id === id)).filter(Boolean).map((q, i) => {
+    const review = selectedAttempt.ids.map(id => questionsById.get(id)).filter(Boolean).map((q, i) => {
       const answer = selectedAttempt.answers[q.id];
       const done = Object.hasOwn(selectedAttempt.answers, q.id);
       const correct = done && answer === q.answer;
       return `<div class="review-item"><span class="badge ${correct ? "open" : "review"}">Q${i + 1} · ${correct ? "Correct" : done ? "Incorrect" : "Unanswered"}</span><p><strong>${h(q.prompt)}</strong></p><p>আপনার উত্তর: ${done ? h(q.options[answer]) : "Skipped"}</p><p>সঠিক: <strong>${h(q.options[q.answer])}</strong></p><p class="muted">${h(q.bn)}</p></div>`;
     }).join("");
-    return `${head}<div class="result-banner"><span class="eyebrow">EXAM RESULTS</span><strong>${selectedAttempt.score}/${selectedAttempt.total} · ${selectedAttempt.percent}%</strong><p>${selectedAttempt.expired ? "সময় শেষ হয়ে টেস্ট জমা হয়েছে" : "আপনি টেস্ট জমা দিয়েছেন"} · ${new Date(selectedAttempt.at).toLocaleString("bn-BD", { timeZone: "Asia/Dhaka" })}</p></div>
+    return `${head}<div class="result-banner"><span class="eyebrow">EXAM RESULTS</span><strong>${selectedAttempt.score}/${selectedAttempt.total} correct · Net ${selectedAttempt.net ?? selectedAttempt.score}</strong><p>${selectedAttempt.expired ? "সময় শেষ হয়ে টেস্ট জমা হয়েছে" : "আপনি টেস্ট জমা দিয়েছেন"} · ${new Date(selectedAttempt.at).toLocaleString("bn-BD", { timeZone: "Asia/Dhaka" })}</p><p>${selectedAttempt.wrong ?? "—"} wrong · ${selectedAttempt.skipped ?? "—"} skipped · Wrong প্রতি ${selectedAttempt.penalty ?? 0} নম্বর কর্তন (এই মকে)</p></div>
       <div class="heading-actions mb"><button class="button primary" data-action="mock-new">+ New Test</button><button class="button" data-action="goto" data-target="practice">Topic Practice →</button></div><section class="panel"><h3>উত্তর ও ব্যাখ্যা</h3>${review}</section>`;
   }
-  return `${head}<div class="section-grid"><section class="panel"><div class="eyebrow">EXAM SIMULATOR</div><h2>শুরু করুন আপনার পরের পরীক্ষা</h2><p class="side-tip">প্রশ্ন এলোমেলো হবে, সময় শেষ হলে স্বয়ংক্রিয়ভাবে জমা হবে। স্কোর ও ভুল উত্তর স্থানীয়ভাবে সংরক্ষিত থাকবে।</p>
-    <div class="mock-setup"><div class="form-field"><label for="mock-count">প্রশ্ন সংখ্যা</label><select class="select" id="mock-count"><option>10</option><option selected>20</option><option>40</option><option>50</option><option>100</option></select></div>
-    <div class="form-field"><label for="mock-minutes">সময় (মিনিট)</label><select class="select" id="mock-minutes"><option>10</option><option selected>25</option><option>45</option><option>60</option></select></div>
-    <div class="form-field"><label for="mock-focus">বিষয়</label><select class="select" id="mock-focus"><option value="All">Technical + General</option><option value="Technical">Technical only</option><option value="General">General only</option></select></div></div>
+  return `${head}<div class="section-grid"><section class="panel"><div class="eyebrow">EXAM SIMULATOR</div><h2>শুরু করুন আপনার পরের পরীক্ষা</h2><p class="side-tip">বিষয়ভিত্তিক balanced random question selection, difficulty, সময় ও optional negative marking। আসল পরীক্ষার নিয়ম মিলিয়ে সেটিং বাছুন।</p>
+    <div class="mock-setup"><div class="form-field"><label for="mock-count">প্রশ্ন সংখ্যা</label><select class="select" id="mock-count"><option>10</option><option>20</option><option selected>50</option><option>100</option><option>200</option></select></div>
+    <div class="form-field"><label for="mock-minutes">সময় (মিনিট)</label><select class="select" id="mock-minutes"><option>10</option><option>25</option><option>45</option><option selected>60</option><option>90</option><option>120</option><option>180</option></select></div>
+    <div class="form-field"><label for="mock-focus">বিষয়</label><select class="select" id="mock-focus"><option value="All">Technical + General</option><option value="Technical">Technical only</option><option value="General">General only</option></select></div>
+    <div class="form-field"><label for="mock-difficulty">Difficulty</label><select class="select" id="mock-difficulty"><option value="All">Balanced: Easy–Hard</option><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
+    <div class="form-field"><label for="mock-penalty">Wrong answer deduction</label><select class="select" id="mock-penalty"><option value="0">None (0)</option><option value="0.25">−0.25</option><option value="0.5">−0.50</option></select></div>
+    <div class="form-field"><label>Study track</label><p class="side-tip">${h(EXAM_TRACKS.find(t => t.id === state.trackId)?.title || "সমন্বিত CSE/IT")} · <a class="link-action" href="#syllabus">Change track</a></p></div></div>
     <button class="button primary" data-action="start-mock">Start Exam →</button></section>
     <aside class="stack"><section class="panel"><h3>সাম্প্রতিক ফলাফল</h3>${state.attempts.length ? state.attempts.slice(0, 8).map(a => `<div class="attempt-row"><span><strong>${a.score}/${a.total} · ${a.percent}%</strong><br><small>${new Date(a.at).toLocaleDateString("bn-BD", { timeZone: "Asia/Dhaka" })}</small></span><button class="button small" data-action="review-mock" data-id="${h(a.id)}">Review →</button></div>`).join("") : '<p class="side-tip mt">এখনো কোনো মডেল টেস্ট দেননি।</p>'}</section>
-    <section class="panel"><h3>পরীক্ষার কৌশল</h3><p class="side-tip mt">সহজ প্রশ্ন আগে দিন। অনুমানভিত্তিক উত্তর দেওয়ার আগে সংশ্লিষ্ট নিয়োগ পরীক্ষায় negative marking আছে কি না যাচাই করুন। এই অ্যাপে প্রতিটি প্রশ্ন ১ নম্বর, negative marking নেই।</p></section></aside></div>`;
+    <section class="panel"><h3>পরীক্ষার কৌশল</h3><p class="side-tip mt">সহজ প্রশ্ন আগে দিন। Negative marking চালু করলে ভুল উত্তর অনুযায়ী নম্বর কাটবে। সঠিক নিয়ম, মোট নম্বর ও সময় নির্দিষ্ট নিয়োগের বিজ্ঞপ্তি থেকে নিন।</p></section></aside></div>`;
 }
 
 function renderNotes() {
@@ -391,7 +523,7 @@ function render() {
     if (link.dataset.nav === current) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   }
-  const views = { dashboard: renderDashboard, circulars: renderCirculars, practice: renderPractice, written: renderWritten, syllabus: renderSyllabus, mock: renderMock, notes: renderNotes };
+  const views = { dashboard: renderDashboard, circulars: renderCirculars, academy: renderAcademy, practice: renderPractice, lab: renderLab, written: renderWritten, syllabus: renderSyllabus, mock: renderMock, analytics: renderAnalytics, notes: renderNotes };
   byId("app").innerHTML = views[current]();
   applyTheme();
   if (current === "mock" && state.activeMock) {
@@ -470,9 +602,14 @@ document.addEventListener("click", event => {
       delete state.jobStatuses[id]; save(); render();
     }
   } else if (action === "answer") {
-    const q = questions.find(x => x.id === id);
+    const q = questionsById.get(id);
     if (!q || state.answers[id] || index < 0 || index >= q.options.length) return;
-    state.answers[id] = { selected: index, correct: index === q.answer, at: `${bangladeshToday()}T${new Date().toISOString().slice(11)}` };
+    const today = bangladeshToday();
+    const correct = index === q.answer;
+    state.answers[id] = { selected: index, correct, at: `${today}T${new Date().toISOString().slice(11)}` };
+    state.reviewSchedule[id] = nextReview(state.reviewSchedule[id], correct, today);
+    state.activity.push({ date: today, topic: q.topic, correct });
+    state.activity = state.activity.slice(-2000);
     save(); render();
   } else if (action === "retry") {
     delete state.answers[id]; save(); render();
@@ -482,13 +619,44 @@ document.addEventListener("click", event => {
   } else if (action === "practice-next" || action === "practice-prev") {
     ui.practiceIndex += action === "practice-next" ? 1 : -1; render();
   } else if (action === "clear-practice-filter") {
-    ui.practiceMode = "All"; ui.practiceTopic = "All"; ui.practiceIndex = 0; render();
+    ui.practiceMode = "All"; ui.practiceTopic = "All"; ui.practiceDifficulty = "All"; ui.practiceSearch = ""; ui.practiceIndex = 0; render();
+  } else if (action === "practice-topic") {
+    const topic = button.dataset.topic;
+    if (!topics.includes(topic)) return;
+    ui.practiceTopic = topic; ui.practiceMode = "All"; ui.practiceDifficulty = "All"; ui.practiceIndex = 0;
+    go("practice");
+  } else if (action === "review-due") {
+    ui.practiceTopic = "All"; ui.practiceDifficulty = "All"; ui.practiceSearch = ""; ui.practiceMode = "Due"; ui.practiceIndex = 0;
+    go("practice");
+  } else if (action === "unit-open") {
+    if (!UNIT_BY_ID[id]) return;
+    ui.academyOpen = ui.academyOpen === id ? null : id;
+    render();
+  } else if (action === "unit-done") {
+    if (!UNIT_BY_ID[id]) return;
+    state.unitDone = state.unitDone.includes(id) ? state.unitDone.filter(x => x !== id) : [...state.unitDone, id];
+    save(); render();
+  } else if (action === "lab-open") {
+    if (!labsById.has(id)) return;
+    ui.labId = id; ui.labHint = false; ui.labSolution = false; render();
+  } else if (action === "lab-hint") {
+    ui.labHint = !ui.labHint; render();
+  } else if (action === "lab-solution") {
+    ui.labSolution = !ui.labSolution; render();
+  } else if (action === "lab-rate") {
+    if (!labsById.has(id) || !["solved", "retry"].includes(button.dataset.rating)) return;
+    state.labResults[id] = button.dataset.rating; save(); render();
   } else if (action === "written-toggle") {
     if (ui.expandedWritten.has(id)) ui.expandedWritten.delete(id);
     else ui.expandedWritten.add(id);
     render();
   } else if (action === "written-done") {
     state.writtenDone = state.writtenDone.includes(id) ? state.writtenDone.filter(x => x !== id) : [...state.writtenDone, id];
+    save(); render();
+  } else if (action === "written-rate") {
+    if (!writtenQuestions.some(q => q.id === id) || !["solved", "retry"].includes(button.dataset.rating)) return;
+    state.writtenResults[id] = button.dataset.rating;
+    if (button.dataset.rating === "solved" && !state.writtenDone.includes(id)) state.writtenDone.push(id);
     save(); render();
   } else if (action === "start-mock") startMock();
   else if (action === "mock-answer") {
@@ -516,11 +684,14 @@ document.addEventListener("click", event => {
 });
 
 document.addEventListener("input", event => {
-  if (event.target.id === "job-search") {
+  const filters = { "job-search": "jobSearch", "practice-search": "practiceSearch", "written-search": "writtenSearch", "lab-search": "labSearch" };
+  const property = filters[event.target.id];
+  if (property) {
     const pos = event.target.selectionStart;
-    ui.jobSearch = event.target.value;
+    ui[property] = event.target.value;
+    if (property === "practiceSearch") ui.practiceIndex = 0;
     render();
-    const next = byId("job-search");
+    const next = byId(event.target.id);
     if (next) { next.focus(); next.setSelectionRange(pos, pos); }
   }
 });
@@ -533,8 +704,21 @@ document.addEventListener("change", event => {
   if (id === "show-expired") { ui.showExpired = element.checked; render(); }
   if (id === "practice-topic") { ui.practiceTopic = element.value; ui.practiceIndex = 0; render(); }
   if (id === "practice-mode") { ui.practiceMode = element.value; ui.practiceIndex = 0; render(); }
+  if (id === "practice-difficulty") { ui.practiceDifficulty = element.value; ui.practiceIndex = 0; render(); }
   if (id === "written-topic") { ui.writtenTopic = element.value; render(); }
+  if (id === "academy-topic") { ui.academyTopic = element.value; render(); }
+  if (id === "track-select") { if (EXAM_TRACKS.some(t => t.id === element.value)) { state.trackId = element.value; save(); render(); } }
+  if (id === "lab-kind") { ui.labKind = element.value; render(); }
+  if (id === "lab-level") { ui.labLevel = element.value; render(); }
   if (id === "daily-goal") { state.dailyGoal = Number(element.value); save(); toast("দৈনিক লক্ষ্য পরিবর্তন হয়েছে।"); render(); }
+  if (element.matches("#lab-form textarea")) {
+    const labId = element.closest("form")?.dataset.labId;
+    if (labsById.has(labId)) { state.labDrafts[labId] = element.value.slice(0, 10000); save(); }
+  }
+  if (element.matches(".written-form textarea")) {
+    const qId = element.closest("form")?.dataset.writtenId;
+    if (writtenQuestions.some(q => q.id === qId)) { state.writtenDrafts[qId] = element.value.slice(0, 10000); save(); }
+  }
   if (element.hasAttribute("data-job-status")) {
     const status = element.value;
     if (["none", "saved", "applied", "exam"].includes(status)) {
@@ -557,6 +741,20 @@ document.addEventListener("change", event => {
 });
 
 document.addEventListener("submit", event => {
+  if (event.target.id === "lab-form") {
+    event.preventDefault();
+    const id = event.target.dataset.labId;
+    if (!labsById.has(id)) return;
+    state.labDrafts[id] = String(new FormData(event.target).get("solution") || "").slice(0, 10000);
+    save(); toast("সমাধান এই browser-এ সেভ হয়েছে।");
+  }
+  if (event.target.classList.contains("written-form")) {
+    event.preventDefault();
+    const id = event.target.dataset.writtenId;
+    if (!writtenQuestions.some(q => q.id === id)) return;
+    state.writtenDrafts[id] = String(new FormData(event.target).get("draft") || "").slice(0, 10000);
+    save(); toast("Written উত্তর সেভ হয়েছে।");
+  }
   if (event.target.id === "job-form") {
     event.preventDefault();
     try {
