@@ -4,6 +4,7 @@ import { drillRows } from "./drills.js";
 import { examRows } from "./exam-rows.js";
 import { numericalScenarioRows } from "./numerical-scenarios.js";
 import { megaRows } from "./mega-bank.js";
+import { generalPrepRows } from "./general-prep.js";
 import { expandedWritten, synthesisWritten } from "./expanded-writing.js";
 // Each row: topic, difficulty, prompt, four options, zero-based answer, English explanation, Bangla explanation.
 const rows = [
@@ -107,11 +108,14 @@ const rows = [
 const originalCount = rows.length + advancedRows.length;
 const existingCount = originalCount + drillRows.length;
 const authoredCount = existingCount + examRows.length;
-export const questions = [...rows, ...advancedRows, ...drillRows, ...examRows, ...numericalScenarioRows, ...megaRows].map(([topic, difficulty, prompt, options, answer, explain, bn], index) => ({
+// Append, never insert ahead of the existing questions: persisted answer,
+// bookmark and revision IDs must remain stable across PWA updates.
+const legacyCount = authoredCount + numericalScenarioRows.length + megaRows.length;
+export const questions = [...rows, ...advancedRows, ...drillRows, ...examRows, ...numericalScenarioRows, ...megaRows, ...generalPrepRows].map(([topic, difficulty, prompt, options, answer, explain, bn, subtopic], index) => ({
   id: `q${String(index + 1).padStart(3, "0")}`,
   category: ["Mathematics","English","Bangla","General Knowledge"].includes(topic) ? "General" : "Technical",
-  topic, difficulty, prompt, options, answer, explain, bn,
-  sourceKind: index >= authoredCount || (index >= originalCount && index < existingCount) ? "Numerical drill variant" : "Original concept/scenario"
+  topic, subtopic: subtopic || null, difficulty, prompt, options, answer, explain, bn,
+  sourceKind: index >= legacyCount ? "Original concept/scenario" : index >= authoredCount || (index >= originalCount && index < existingCount) ? "Numerical drill variant" : "Original concept/scenario"
 }));
 
 export const writtenQuestions = [

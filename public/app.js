@@ -14,7 +14,7 @@ const topicTotals = new Map(topics.map(topic => [topic, questions.filter(q => q.
 let state = loadState();
 const ui = {
   jobSearch: "", jobSector: "All", jobStatus: "All", showExpired: false,
-  practiceTopic: "All", practiceMode: "All", practiceIndex: 0, practiceDifficulty: "All", practiceSearch: "",
+  practiceTopic: "All", practiceSubtopic: "All", practiceMode: "All", practiceIndex: 0, practiceDifficulty: "All", practiceSearch: "",
   practiceSource: "All", writtenTopic: "All", writtenSearch: "", writtenPage: 0, expandedWritten: new Set(),
   academyTopic: "All", academyOpen: null,
   labKind: "All", labLevel: "All", labSearch: "", labPage: 0, labId: LABS[0]?.id, labHint: false, labSolution: false,
@@ -275,6 +275,7 @@ function filteredQuestions() {
   const search = ui.practiceSearch.trim().toLocaleLowerCase();
   return questions.filter(q => {
     if (ui.practiceTopic !== "All" && q.topic !== ui.practiceTopic) return false;
+    if (ui.practiceSubtopic !== "All" && q.subtopic !== ui.practiceSubtopic) return false;
     if (ui.practiceDifficulty !== "All" && q.difficulty !== ui.practiceDifficulty) return false;
     if (ui.practiceSource === "Authored" && q.sourceKind !== "Original concept/scenario") return false;
     if (ui.practiceSource === "Variant" && q.sourceKind !== "Numerical drill variant") return false;
@@ -293,10 +294,14 @@ function renderPractice() {
   ui.practiceIndex = Math.min(Math.max(ui.practiceIndex, 0), Math.max(0, list.length - 1));
   const q = list[ui.practiceIndex];
   const answer = q ? state.answers[q.id] : null;
+  const subtopics = ui.practiceTopic === "All" ? [] : [...new Set(questions.filter(item => item.topic === ui.practiceTopic && item.subtopic).map(item => item.subtopic))].sort();
+  const subtopicControl = !subtopics.length ? "" : '<select class="select" id="practice-subtopic" aria-label="উপবিষয়"><option value="All">সব উপবিষয়</option>' +
+    subtopics.map(name => '<option value="' + h(name) + '"' + (ui.practiceSubtopic === name ? " selected" : "") + '>' + h(name) + '</option>').join("") + '</select>';
   const head = section("Topic-wise MCQ Practice", "Concept, calculation এবং ট্র্যাকভিত্তিক অনুশীলন; প্রস্তুতিমূলক প্রশ্ন, অফিসিয়াল বিগত প্রশ্ন নয়।",
     '<button class="button" data-action="goto" data-target="mock">◷ Timed Mock Test</button>');
   const toolbar = `<div class="toolbar"><label class="search-box"><input class="input" type="search" id="practice-search" placeholder="প্রশ্ন খুঁজুন..." aria-label="Search questions" value="${h(ui.practiceSearch)}"></label>
     <select class="select" id="practice-topic" aria-label="প্রশ্নের বিষয়"><option value="All">সব বিষয়</option>${topics.map(t => `<option value="${h(t)}"${ui.practiceTopic === t ? " selected" : ""}>${h(t)}</option>`).join("")}</select>
+    ${subtopicControl}
     <select class="select" id="practice-difficulty" aria-label="Difficulty"><option value="All">সব লেভেল</option>${["Easy", "Medium", "Hard"].map(level => `<option value="${level}"${ui.practiceDifficulty === level ? " selected" : ""}>${level}</option>`).join("")}</select>
     <select class="select" id="practice-source" aria-label="Question origin"><option value="All">Original + Variants</option><option value="Authored"${ui.practiceSource === "Authored" ? " selected" : ""}>Authored concepts</option><option value="Variant"${ui.practiceSource === "Variant" ? " selected" : ""}>Numerical scenarios</option></select>
     <select class="select" id="practice-mode" aria-label="প্রশ্নের ধরন"><option value="All">সব প্রশ্ন</option><option value="Unanswered"${ui.practiceMode === "Unanswered" ? " selected" : ""}>Unanswered</option><option value="Wrong"${ui.practiceMode === "Wrong" ? " selected" : ""}>Wrong answers</option><option value="Due"${ui.practiceMode === "Due" ? " selected" : ""}>Due for revision</option><option value="Bookmarked"${ui.practiceMode === "Bookmarked" ? " selected" : ""}>Bookmarked</option></select>
@@ -670,14 +675,14 @@ document.addEventListener("click", event => {
   } else if (action === "practice-next" || action === "practice-prev") {
     ui.practiceIndex += action === "practice-next" ? 1 : -1; render();
   } else if (action === "clear-practice-filter") {
-    ui.practiceMode = "All"; ui.practiceTopic = "All"; ui.practiceDifficulty = "All"; ui.practiceSearch = ""; ui.practiceSource = "All"; ui.practiceIndex = 0; render();
+    ui.practiceMode = "All"; ui.practiceTopic = "All"; ui.practiceSubtopic = "All"; ui.practiceDifficulty = "All"; ui.practiceSearch = ""; ui.practiceSource = "All"; ui.practiceIndex = 0; render();
   } else if (action === "practice-topic") {
     const topic = button.dataset.topic;
     if (!topics.includes(topic)) return;
-    ui.practiceTopic = topic; ui.practiceMode = "All"; ui.practiceDifficulty = "All"; ui.practiceIndex = 0;
+    ui.practiceTopic = topic; ui.practiceSubtopic = "All"; ui.practiceMode = "All"; ui.practiceDifficulty = "All"; ui.practiceIndex = 0;
     go("practice");
   } else if (action === "review-due") {
-    ui.practiceTopic = "All"; ui.practiceDifficulty = "All"; ui.practiceSearch = ""; ui.practiceMode = "Due"; ui.practiceIndex = 0;
+    ui.practiceTopic = "All"; ui.practiceSubtopic = "All"; ui.practiceDifficulty = "All"; ui.practiceSearch = ""; ui.practiceMode = "Due"; ui.practiceIndex = 0;
     go("practice");
   } else if (action === "unit-open") {
     if (!UNIT_BY_ID[id]) return;
@@ -774,7 +779,8 @@ document.addEventListener("change", event => {
   if (id === "job-sector") { ui.jobSector = element.value; render(); }
   if (id === "job-filter") { ui.jobStatus = element.value; render(); }
   if (id === "show-expired") { ui.showExpired = element.checked; render(); }
-  if (id === "practice-topic") { ui.practiceTopic = element.value; ui.practiceIndex = 0; render(); }
+  if (id === "practice-topic") { ui.practiceTopic = element.value; ui.practiceSubtopic = "All"; ui.practiceIndex = 0; render(); }
+  if (id === "practice-subtopic") { ui.practiceSubtopic = element.value; ui.practiceIndex = 0; render(); }
   if (id === "practice-mode") { ui.practiceMode = element.value; ui.practiceIndex = 0; render(); }
   if (id === "practice-difficulty") { ui.practiceDifficulty = element.value; ui.practiceIndex = 0; render(); }
   if (id === "practice-source") { ui.practiceSource = element.value; ui.practiceIndex = 0; render(); }
