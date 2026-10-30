@@ -1,9 +1,9 @@
-const VERSION = "cseprep-v7-academy-general-20261031";
+const VERSION = "cseprep-v8-technical-content-20261031";
 const CORE = [
   "/", "/index.html", "/styles.css", "/app.js", "/core.js", "/preparation-core.js",
   "/data/jobs.js", "/data/discovered.js", "/data/questions.js", "/data/advanced.js", "/data/drills.js",
   "/data/exam-rows.js", "/data/numerical-scenarios.js", "/data/mega-bank.js", "/data/general-prep.js", "/data/general-lexicon.js", "/data/reference-facts.js", "/data/general-extended.js", "/data/expanded-writing.js",
-  "/data/expanded-labs.js", "/data/curriculum.js", "/data/master-notes.js", "/data/labs.js", "/previous-core.js",
+  "/data/expanded-labs.js", "/data/curriculum.js", "/data/master-notes.js", "/data/labs.js", "/data/technical-authored.js", "/data/technical-written.js", "/data/technical-labs.js", "/previous-core.js",
   "/manifest.webmanifest", "/icon.svg",
   "/icons/icon-192.png", "/icons/icon-512.png"
 ];

@@ -25,10 +25,12 @@ test("appended chapters and written tasks preserve existing progress identifiers
   assert.equal(UNITS[0].id, "ds-array");
   assert.equal(UNITS[25].id, "gk");
   assert.equal(UNITS[26].id, "bangla-sandhi");
-  assert.equal(writtenQuestions.length, 1333);
+  assert.equal(writtenQuestions.length, 1353);
+  assert.equal(writtenQuestions[1332].id, "ws082");
   assert.ok(writtenQuestions.some(q => q.id === "ws001"));
   assert.ok(writtenQuestions.some(q => q.id === "ws082"));
-  assert.equal(questions.length, 16521);
+  assert.equal(questions.length, 16641);
+  assert.equal(questions[16520].id, "q16521");
   assert.equal(questions[11979].id, "q11980");
   assert.equal(questions[12561].id, "q12562");
   assert.equal(questions[12562].id, "q12563");

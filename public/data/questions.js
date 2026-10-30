@@ -7,6 +7,8 @@ import { megaRows } from "./mega-bank.js";
 import { generalPrepRows } from "./general-prep.js";
 import { extendedGeneralRows } from "./general-extended.js";
 import { expandedWritten, synthesisWritten } from "./expanded-writing.js";
+import { technicalAuthoredRows } from "./technical-authored.js";
+import { technicalWritten } from "./technical-written.js";
 // Each row: topic, difficulty, prompt, four options, zero-based answer, English explanation, Bangla explanation.
 const rows = [
   ["Data Structures","Easy","What is the worst-case time complexity of binary search on a sorted array?",["O(1)","O(log n)","O(n)","O(n²)"],1,"Binary search halves the search interval on each step.","প্রতি ধাপে খোঁজার পরিসর অর্ধেক হয়, তাই O(log n)।"],
@@ -112,7 +114,7 @@ const authoredCount = existingCount + examRows.length;
 // Append, never insert ahead of the existing questions: persisted answer,
 // bookmark and revision IDs must remain stable across PWA updates.
 const legacyCount = authoredCount + numericalScenarioRows.length + megaRows.length;
-export const questions = [...rows, ...advancedRows, ...drillRows, ...examRows, ...numericalScenarioRows, ...megaRows, ...generalPrepRows, ...extendedGeneralRows].map(([topic, difficulty, prompt, options, answer, explain, bn, subtopic, explicitSourceKind], index) => ({
+export const questions = [...rows, ...advancedRows, ...drillRows, ...examRows, ...numericalScenarioRows, ...megaRows, ...generalPrepRows, ...extendedGeneralRows, ...technicalAuthoredRows].map(([topic, difficulty, prompt, options, answer, explain, bn, subtopic, explicitSourceKind], index) => ({
   id: `q${String(index + 1).padStart(3, "0")}`,
   category: ["Mathematics","English","Bangla","General Knowledge"].includes(topic) ? "General" : "Technical",
   topic, subtopic: subtopic || null, difficulty, prompt, options, answer, explain, bn,
@@ -139,6 +141,7 @@ export const writtenQuestions = [
   ...advancedWritten,
   ...expandedWritten,
   ...synthesisWritten,
+  ...technicalWritten,
 ];
 
 export const topics = [...new Set(questions.map(item => item.topic))];

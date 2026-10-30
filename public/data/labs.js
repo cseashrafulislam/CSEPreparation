@@ -1,6 +1,7 @@
 // Original offline self-assessment exercises. Solutions are reference approaches,
 // not automatically graded submissions or official past paper reproductions.
 import { expandedLabs } from "./expanded-labs.js";
+import { technicalLabs } from "./technical-labs.js";
 // [kind, topic, level, title, task, hint, solution, check]
 const rows = [
   ["Coding","Algorithms","Medium","Pair sum with duplicate values","Given integer array A and target T, return indices i<j with A[i]+A[j]=T, or -1. Target O(n) time. Explain duplicate handling.","Store value→index in a hash map; check T−x before insertion.","for i=0..n−1: if map has (T−A[i]), return (map[T−A[i]],i); else map[A[i]]=i. Return -1. O(n) expected time, O(n) space. Check before insertion to avoid reusing one element.","Test [3,3], T=6 and [1,2], T=8; explain duplicate handling."],
@@ -55,6 +56,6 @@ export const LABS = rows.map(([kind, topic, difficulty, title, prompt, hint, sol
   id: `lab-${String(i + 1).padStart(3, "0")}`,
   kind, topic, difficulty, title, prompt, hint, solution, check,
   rubric: RUBRIC[kind]
-})).concat(expandedLabs);
+})).concat(expandedLabs, technicalLabs);
 
 export const LAB_KINDS = [...new Set(LABS.map(item => item.kind))];

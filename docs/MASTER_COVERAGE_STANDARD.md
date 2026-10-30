@@ -57,13 +57,15 @@ A Bangladesh CSE/IT job candidate should be able to learn concepts, solve MCQs, 
 - **Career:** Automatic daily discovery runs and creates dated, deduplicated leads; official circulars and deadlines are verified separately. Monitor recurring failures and preserve the last good feed.
 - **Safety:** Browser-local data remains private/offline; export/restore works; cache/version upgrades do not erase history; mobile accessibility and performance smoke tests pass.
 
-## Current verified baseline (2026-10-31)
+## Current code baseline (2026-10-31)
 
-- Live and GitHub: 12,562 MCQ practice cases = 927 authored concepts and 11,635 numerical/drill variants.
-- General subject counts: Bangla 225, English 252, General Knowledge 156. Each still below the independent 1,500 target.
-- 41 study chapters with original worked notes and recall; 1,333 written cases; 400 practical cases; 8 tracks.
+- Repository content: 16,641 MCQ practice cases = 1,751 original authored questions, 3,255 structured recall variations and 11,635 numerical/drill variants. Added 120 independently phrased technical questions, eight per CSE subject; legacy question identifiers remain unchanged.
+- General subject counts: Bangla 1,539, English 1,545, General Knowledge 1,508 **total practice cases**. Authored independent concept/fact subsets are only 441, 446 and 450; the rest are structured variations. The **independent 1,500-per-subject target remains unmet**.
+- 41 study chapters with original worked notes and recall; 1,353 written cases (20 added detailed technical solutions); 420 practical cases (20 added original worked exercises); 8 tracks.
 - Previous-paper archive functionality exists, but no independently authenticated paper bundled.
 - GitHub Actions daily-circular workflow was manually triggered successfully once; ongoing scheduled-run reliability not yet proven.
+
+The new batch includes tests for distinct options, unique question wording, bilingual explanations, all 15 technical subjects, written/practical rubrics and historical ID stability. Automated checks do not substitute for subject-matter editorial review or the official recruiting agency's current syllabus.
 
 ## Implementation order
 

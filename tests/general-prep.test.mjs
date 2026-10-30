@@ -29,14 +29,15 @@ test("Bangla, English and GK each have at least 1,500 separately answerable prac
 test("new general bank is original material and preserves earlier saved ID sequence", () => {
   assert.equal(generalPrepRows.length, 583);
   assert.equal(extendedGeneralRows.length, 3959);
-  assert.equal(questions.length, 16_521);
+  assert.equal(questions.length, 16_641);
+  assert.equal(questions[16_520].id, "q16521");
   assert.equal(questions[11_978].id, "q11979");
   assert.equal(questions[11_979].id, "q11980");
   assert.equal(questions[12_561].id, "q12562");
   assert.equal(questions[12_562].id, "q12563");
   assert.equal(questions[11_979].sourceKind, "Original concept/scenario");
   assert.equal(questions.filter(q => q.sourceKind === "Numerical drill variant").length, 11_635);
-  assert.equal(questions.filter(q => q.sourceKind === "Original concept/scenario").length, 1631);
+  assert.equal(questions.filter(q => q.sourceKind === "Original concept/scenario").length, 1751);
   assert.equal(questions.filter(q => q.sourceKind === "Structured practice variation").length, 3255);
   for (const row of generalPrepRows) {
     assert.ok(["Bangla", "English", "General Knowledge"].includes(row[0]));
