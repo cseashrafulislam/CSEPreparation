@@ -2,6 +2,8 @@
 
 Personal, fully static, offline-capable PWA for **Bangladesh CSE/IT government job circulars and exam preparation**. One user, no login, no payments, no server, no database, no R2.
 
+Development completion criteria for the owner's complete CSE/IT preparation goal: [Master Coverage Standard](docs/MASTER_COVERAGE_STANDARD.md). The current content does **not** yet meet all those gates.
+
 
 ## Included
 
