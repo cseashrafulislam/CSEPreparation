@@ -3,6 +3,7 @@ import { officialJobs, JOBS_LAST_CHECKED, sourceLinks } from "./data/jobs.js";
 import { DISCOVERY_ITEMS, DISCOVERY_LAST_RUN, DISCOVERY_FEEDS_OK } from "./data/discovered.js";
 import { questions, writtenQuestions, topics } from "./data/questions.js";
 import { EXAM_TRACKS, UNITS, UNIT_BY_ID, trackTopics } from "./data/curriculum.js";
+import { MASTER_NOTES } from "./data/master-notes.js";
 import { LABS, LAB_KINDS } from "./data/labs.js";
 import { nextReview, dueQuestionIds, topicAnalytics, recommendedTopics, createBalancedMock, scoreWithPenalty, mockTopicBreakdown } from "./preparation-core.js";
 import { mergePrevious, PREVIOUS_TEMPLATE } from "./previous-core.js";
@@ -16,7 +17,7 @@ const ui = {
   jobSearch: "", jobSector: "All", jobStatus: "All", showExpired: false,
   practiceTopic: "All", practiceSubtopic: "All", practiceMode: "All", practiceIndex: 0, practiceDifficulty: "All", practiceSearch: "",
   practiceSource: "All", writtenTopic: "All", writtenSearch: "", writtenPage: 0, expandedWritten: new Set(),
-  academyTopic: "All", academyOpen: null,
+  academyTopic: "All", academySearch: "", academyOpen: null, academyAnswer: null,
   labKind: "All", labLevel: "All", labSearch: "", labPage: 0, labId: LABS[0]?.id, labHint: false, labSolution: false,
   previousSearch: "", previousType: "All", previousPage: 0,
   mockReviewId: null, mockTrack: state.trackId, installPrompt: null
@@ -211,24 +212,33 @@ function renderCirculars() {
 
 function renderAcademy() {
   const focus = new Set(trackTopics(state.trackId));
-  const visible = UNITS.filter(unit => ui.academyTopic === "All" ? focus.has(unit.topic) : unit.topic === ui.academyTopic);
+  const query = ui.academySearch.trim().toLocaleLowerCase();
+  const visible = UNITS.filter(unit =>
+    (ui.academyTopic === "All" ? focus.has(unit.topic) : unit.topic === ui.academyTopic) &&
+    (!query || `${unit.topic} ${unit.title} ${unit.concept} ${unit.checklist.join(" ")} ${MASTER_NOTES[unit.id]?.rule || ""}`.toLocaleLowerCase().includes(query))
+  );
   const complete = visible.filter(unit => state.unitDone.includes(unit.id)).length;
-  return `${section("CSE / IT Study Academy", "শুধু প্রশ্ন মুখস্থ নয়—সিলেবাস, সূত্র, সমস্যা সমাধান এবং পরীক্ষায় ভুল হওয়ার জায়গাগুলো ধরে পড়ুন.",
+  return `${section("CSE / IT Master Study Academy", "বিষয়ভিত্তিক ব্যাখ্যা, পরীক্ষার নিয়ম, সমাধানসহ উদাহরণ ও self-check—এক জায়গায়।",
     '<button class="button primary" data-action="goto" data-target="lab">Coding & SQL Lab →</button>')}
-    <div class="info-banner"><b>ⓘ</b><p>এটি CSE চাকরির প্রস্তুতির জন্য নিজস্ব Study Outline, BUET বা কোনো নিয়োগকারীর অফিসিয়াল সিলেবাস নয়। মূল বিজ্ঞপ্তির সিলেবাসকে সর্বোচ্চ অগ্রাধিকার দিন।</p></div>
+    <div class="info-banner"><b>ⓘ</b><p>এগুলো original preparation notes, official BUET/BPSC/নিয়োগকারীর সিলেবাস বা authentic previous paper নয়। নির্দিষ্ট সার্কুলারের syllabus ও বর্তমান তথ্য সবসময় যাচাই করুন। শুধু ‘studied’ চিহ্নিত করা মানে পরীক্ষায় দক্ষতা প্রমাণ নয়।</p></div>
     <div class="toolbar"><label class="form-field"><span class="subtle">আপনার প্রস্তুতির ধরন</span><select id="track-select" class="select">${EXAM_TRACKS.map(track => `<option value="${track.id}"${state.trackId === track.id ? " selected" : ""}>${h(track.title)}</option>`).join("")}</select></label>
       <label class="form-field"><span class="subtle">বিষয়</span><select id="academy-topic" class="select"><option value="All">এই ট্র্যাকের সব বিষয়</option>${[...new Set(UNITS.map(u => u.topic))].map(topic => `<option value="${h(topic)}"${ui.academyTopic === topic ? " selected" : ""}>${h(topic)}</option>`).join("")}</select></label>
+      <label class="search-box"><input class="input" id="academy-search" type="search" placeholder="Chapter, rule বা keyword খুঁজুন..." value="${h(ui.academySearch)}" aria-label="Study lessons search"></label>
       <span class="badge">${complete}/${visible.length} Unit সম্পন্ন</span>
     </div>
-    <div class="unit-grid">${visible.map(unit => `<article class="unit-card ${state.unitDone.includes(unit.id) ? "done" : ""}">
+    <div class="unit-grid">${visible.map(unit => { const lesson = MASTER_NOTES[unit.id]; const opened = ui.academyOpen === unit.id; return `<article class="unit-card ${state.unitDone.includes(unit.id) ? "done" : ""} ${opened ? "expanded" : ""}">
       <div class="unit-header"><span class="badge">${h(unit.topic)}</span><span class="subtle">${state.unitDone.includes(unit.id) ? "✓ সম্পন্ন" : "পড়ার বাকি"}</span></div>
       <h3>${h(unit.title)}</h3><p>${h(unit.concept)}</p>
-      ${ui.academyOpen === unit.id ? `<div class="unit-detail"><h4>যা শিখতে হবে</h4><ul>${unit.checklist.map(item => `<li>${h(item)}</li>`).join("")}</ul>
-        <p><strong>সাধারণ ভুল:</strong> ${h(unit.pitfalls)}</p><p><strong>লিখে অনুশীলন:</strong> ${h(unit.exercise)}</p></div>` : ""}
-      <div class="unit-actions"><button class="button small" data-action="unit-open" data-id="${unit.id}">${ui.academyOpen === unit.id ? "সংক্ষিপ্ত করুন −" : "বিস্তারিত পড়ুন +"}</button>
+      ${opened ? `<div class="unit-detail"><h4>এই Chapter-এ যা শিখবেন</h4><ul>${unit.checklist.map(item => `<li>${h(item)}</li>`).join("")}</ul>
+        ${lesson ? `<div class="lesson-block"><h4>মূল নিয়ম ও গভীর ব্যাখ্যা</h4><p>${h(lesson.rule)}</p></div>
+          <div class="lesson-block"><h4>সমাধানসহ Exam Example</h4><p><strong>Problem:</strong> ${h(lesson.question)}</p><p><strong>ধাপে ধাপে উত্তর:</strong> ${h(lesson.solution)}</p></div>
+          <div class="lesson-block"><h4>নিজেকে যাচাই করুন (Active Recall)</h4><p>${h(lesson.recall)}</p><button class="button small soft" data-action="unit-answer" data-id="${unit.id}" aria-expanded="${ui.academyAnswer === unit.id}">${ui.academyAnswer === unit.id ? "উত্তর লুকান −" : "উত্তর দেখুন +"}</button>
+            ${ui.academyAnswer === unit.id ? `<p class="recall-answer"><strong>Answer:</strong> ${h(lesson.answer)}</p>` : ""}</div>` : ""}
+        <p><strong>সাধারণ ভুল:</strong> ${h(unit.pitfalls)}</p><p><strong>নিজে লিখে অনুশীলন:</strong> ${h(unit.exercise)}</p></div>` : ""}
+      <div class="unit-actions"><button class="button small" data-action="unit-open" data-id="${unit.id}" aria-expanded="${opened}">${opened ? "সংক্ষিপ্ত করুন −" : "Complete Lesson পড়ুন +"}</button>
         <button class="button small ${state.unitDone.includes(unit.id) ? "selected" : ""}" data-action="unit-done" data-id="${unit.id}">${state.unitDone.includes(unit.id) ? "✓ Completed" : "✓ Mark studied"}</button>
         <button class="button small soft" data-action="practice-topic" data-topic="${h(unit.topic)}">MCQ →</button></div>
-    </article>`).join("") || '<div class="empty">এই ফিল্টারে কোনো Unit নেই।</div>'}</div>`;
+    </article>`; }).join("") || '<div class="empty">এই ফিল্টারে কোনো Unit নেই।</div>'}</div>`;
 }
 
 function filteredLabs() {
@@ -687,6 +697,11 @@ document.addEventListener("click", event => {
   } else if (action === "unit-open") {
     if (!UNIT_BY_ID[id]) return;
     ui.academyOpen = ui.academyOpen === id ? null : id;
+    ui.academyAnswer = null;
+    render();
+  } else if (action === "unit-answer") {
+    if (!UNIT_BY_ID[id] || !MASTER_NOTES[id] || ui.academyOpen !== id) return;
+    ui.academyAnswer = ui.academyAnswer === id ? null : id;
     render();
   } else if (action === "unit-done") {
     if (!UNIT_BY_ID[id]) return;
@@ -758,7 +773,7 @@ document.addEventListener("click", event => {
 });
 
 document.addEventListener("input", event => {
-  const filters = { "job-search": "jobSearch", "practice-search": "practiceSearch", "written-search": "writtenSearch", "lab-search": "labSearch", "previous-search": "previousSearch" };
+  const filters = { "job-search": "jobSearch", "practice-search": "practiceSearch", "written-search": "writtenSearch", "lab-search": "labSearch", "previous-search": "previousSearch", "academy-search": "academySearch" };
   const property = filters[event.target.id];
   if (property) {
     const pos = event.target.selectionStart;

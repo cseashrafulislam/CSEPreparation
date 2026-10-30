@@ -47,6 +47,7 @@ body{color:var(--text);background:var(--bg)}button,input,select,textarea{color:v
 .unit-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,370px),1fr));gap:16px;align-items:start}
 .unit-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:21px 22px;box-shadow:var(--shadow);min-height:220px}
 .unit-card.done{border-color:var(--green)}
+.unit-card.expanded{grid-column:1/-1}
 .unit-header,.unit-actions,.lab-toolrow{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .unit-header{justify-content:space-between;margin-bottom:12px}
 .unit-card h3{font-size:17px;margin:0 0 8px;line-height:1.45}
@@ -56,6 +57,10 @@ body{color:var(--text);background:var(--bg)}button,input,select,textarea{color:v
 .unit-detail h4{margin:0 0 4px;font-size:12px}
 .unit-detail ul{margin:0 0 12px;padding-left:20px}
 .unit-detail p{margin-bottom:8px}
+.unit-detail .lesson-block{padding:16px 18px;margin:14px 0;background:var(--surface-alt,var(--bg));border:1px solid var(--border);border-radius:12px;font-size:13px;line-height:1.9}
+.unit-detail .lesson-block h4{font-size:14px;margin:0 0 9px}
+.unit-detail .lesson-block p{margin:0 0 10px;max-width:95ch}
+.unit-detail .lesson-block .recall-answer{margin-top:12px;padding:10px 12px;border-left:3px solid var(--green);background:var(--surface)}
 .lab-layout{display:grid;grid-template-columns:minmax(240px,300px) minmax(0,1fr);gap:17px;align-items:start}
 .lab-picker{padding:18px 13px;position:sticky;top:17px;max-height:calc(100vh - 36px);display:flex;flex-direction:column}
 .lab-picker .panel-header{padding:0 8px;margin-bottom:12px}

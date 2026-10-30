@@ -1,9 +1,9 @@
-const VERSION = "cseprep-v5-general-bank-20261030";
+const VERSION = "cseprep-v6-master-academy-20261031";
 const CORE = [
   "/", "/index.html", "/styles.css", "/app.js", "/core.js", "/preparation-core.js",
   "/data/jobs.js", "/data/discovered.js", "/data/questions.js", "/data/advanced.js", "/data/drills.js",
   "/data/exam-rows.js", "/data/numerical-scenarios.js", "/data/mega-bank.js", "/data/general-prep.js", "/data/expanded-writing.js",
-  "/data/expanded-labs.js", "/data/curriculum.js", "/data/labs.js", "/previous-core.js",
+  "/data/expanded-labs.js", "/data/curriculum.js", "/data/master-notes.js", "/data/labs.js", "/previous-core.js",
   "/manifest.webmanifest", "/icon.svg",
   "/icons/icon-192.png", "/icons/icon-512.png"
 ];
