@@ -20,6 +20,8 @@ export const DEFAULT_STATE = {
   writtenResults: {},
   reviewSchedule: {},
   activity: [],
+  previousQuestions: [],
+  previousDone: [],
 };
 
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -31,9 +33,9 @@ export function normalizeState(input) {
   result.theme = result.theme === "dark" ? "dark" : "light";
   result.dailyGoal = Math.max(5, Math.min(100, Number(result.dailyGoal) || 15));
   result.answers = result.answers && typeof result.answers === "object" && !Array.isArray(result.answers) ? result.answers : {};
-  for (const key of ["bookmarks", "writtenDone", "customJobs", "attempts", "notes", "unitDone", "activity"])
+  for (const key of ["bookmarks", "writtenDone", "customJobs", "attempts", "notes", "unitDone", "activity", "previousQuestions", "previousDone"])
     result[key] = Array.isArray(result[key]) ? result[key].slice(0, 2000) : [];
-  result.trackId = ["all", "technical", "bank", "developer"].includes(result.trackId) ? result.trackId : "all";
+  result.trackId = ["all", "technical", "bank", "developer", "buet", "govt", "network", "academic"].includes(result.trackId) ? result.trackId : "all";
   result.unitDone = [...new Set(result.unitDone.filter(item => typeof item === "string" && item.length < 70))];
   for (const key of ["labDrafts", "writtenDrafts"]) {
     const data = result[key] && typeof result[key] === "object" && !Array.isArray(result[key]) ? result[key] : {};
@@ -64,6 +66,8 @@ export function normalizeState(input) {
     id: String(n.id || Date.now()), text: n.text.slice(0, 2000), at: n.at
   }));
   result.attempts = result.attempts.filter(a => a && Array.isArray(a.ids) && typeof a.at === "string" && Number.isFinite(Date.parse(a.at))).slice(0, 60);
+  result.previousQuestions = result.previousQuestions.filter(item => item && typeof item === "object" && !Array.isArray(item) && /^prev-[a-z0-9-]{1,80}$/.test(item.id || "") && typeof item.question === "string" && item.question.length <= 1500 && safeHttps(item.sourceUrl)).slice(0, 2000);
+  result.previousDone = [...new Set(result.previousDone.filter(id => typeof id === "string" && /^prev-[a-z0-9-]{1,80}$/.test(id)))];
   result.jobStatuses = result.jobStatuses && typeof result.jobStatuses === "object" && !Array.isArray(result.jobStatuses) ? result.jobStatuses : {};
   result.activeMock = result.activeMock && typeof result.activeMock === "object" && Array.isArray(result.activeMock.ids) ? result.activeMock : null;
   return result;

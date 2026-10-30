@@ -3,6 +3,8 @@ import { advancedRows, advancedWritten } from "./advanced.js";
 import { drillRows } from "./drills.js";
 import { examRows } from "./exam-rows.js";
 import { numericalScenarioRows } from "./numerical-scenarios.js";
+import { megaRows } from "./mega-bank.js";
+import { expandedWritten, synthesisWritten } from "./expanded-writing.js";
 // Each row: topic, difficulty, prompt, four options, zero-based answer, English explanation, Bangla explanation.
 const rows = [
   ["Data Structures","Easy","What is the worst-case time complexity of binary search on a sorted array?",["O(1)","O(log n)","O(n)","O(n²)"],1,"Binary search halves the search interval on each step.","প্রতি ধাপে খোঁজার পরিসর অর্ধেক হয়, তাই O(log n)।"],
@@ -105,7 +107,7 @@ const rows = [
 const originalCount = rows.length + advancedRows.length;
 const existingCount = originalCount + drillRows.length;
 const authoredCount = existingCount + examRows.length;
-export const questions = [...rows, ...advancedRows, ...drillRows, ...examRows, ...numericalScenarioRows].map(([topic, difficulty, prompt, options, answer, explain, bn], index) => ({
+export const questions = [...rows, ...advancedRows, ...drillRows, ...examRows, ...numericalScenarioRows, ...megaRows].map(([topic, difficulty, prompt, options, answer, explain, bn], index) => ({
   id: `q${String(index + 1).padStart(3, "0")}`,
   category: ["Mathematics","English","Bangla","General Knowledge"].includes(topic) ? "General" : "Technical",
   topic, difficulty, prompt, options, answer, explain, bn,
@@ -130,6 +132,8 @@ export const writtenQuestions = [
   { id: "w15", topic: "Bangla", prompt: "বাংলায় একটি সরকারি চাকরির আবেদনপত্রের কাঠামো লিখুন।", answer: "তারিখ → বরাবর (কর্তৃপক্ষের পদবি ও ঠিকানা) → বিষয় → সম্ভাষণ → সংক্ষিপ্ত মূল বক্তব্য (পদ, যোগ্যতা, আগ্রহ) → বিনীত অনুরোধ → ধন্যবাদ → বিনীত নিবেদক ও সংযুক্তির তালিকা।", bn: "আবেদনপত্র সংক্ষিপ্ত, শুদ্ধ, তথ্যভিত্তিক ও প্রাসঙ্গিক রাখুন।" },
   { id: "w16", topic: "General Knowledge", prompt: "Briefly explain why the Bangladesh Constitution is important to public administration.", answer: "The Constitution is the supreme legal framework for state institutions, fundamental rights, public authority and accountability. Public servants must work within constitutional and statutory limits.", bn: "সংবিধান রাষ্ট্রীয় ক্ষমতা, নাগরিক অধিকার এবং প্রশাসনিক জবাবদিহিতার মূল কাঠামো।" },
   ...advancedWritten,
+  ...expandedWritten,
+  ...synthesisWritten,
 ];
 
 export const topics = [...new Set(questions.map(item => item.topic))];

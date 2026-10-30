@@ -100,5 +100,11 @@ body{color:var(--text);background:var(--bg)}button,input,select,textarea{color:v
 .activity-bar{width:min(30px,100%);border-radius:7px 7px 0 0;background:linear-gradient(#6793f6,#315bdd);min-height:3px}
 .activity-day small{color:var(--muted);font-size:9px}
 .activity-day strong{font-size:11px}
+.pager{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;padding:13px 2px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.lab-picker .pager{margin-top:9px;border-top:1px solid var(--border);padding:12px 4px 2px}
+.previous-options{padding-left:24px;font-size:12px;line-height:1.8;margin:13px 0}
+.previous-options li{padding:2px 0;overflow-wrap:anywhere}
+.written-item .caption{letter-spacing:.4px;font-size:10px}
+.written-answer .reference-answer p,.written-answer .reference-answer small{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:1100px){.lab-layout{grid-template-columns:225px minmax(0,1fr)}}
 @media(max-width:700px){.lab-layout{grid-template-columns:1fr}.lab-picker{position:static;max-height:245px}.lab-work{padding:20px 17px}.unit-grid{grid-template-columns:1fr}.toolbar .form-field{width:100%}.toolbar .form-field .select{width:100%}.compact-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}

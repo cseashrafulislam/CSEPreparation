@@ -56,11 +56,12 @@ export function recommendedTopics(groups, trackId = "all", limit = 5) {
 }
 
 export function createBalancedMock(questionBank, options = {}, random = Math.random) {
-  const { count = 50, focus = "All", trackId = "all", difficulty = "All" } = options;
+  const { count = 50, focus = "All", trackId = "all", difficulty = "All", source = "All" } = options;
   const preferred = new Set(trackTopics(trackId));
   const pool = questionBank.filter(q =>
     (focus === "All" || q.category === focus) &&
     (difficulty === "All" || q.difficulty === difficulty) &&
+    (source === "All" || (source === "Authored" ? q.sourceKind === "Original concept/scenario" : q.sourceKind === "Numerical drill variant")) &&
     preferred.has(q.topic)
   );
   const byTopic = new Map();
@@ -91,4 +92,20 @@ export function scoreWithPenalty(questions, answers, penalty = 0) {
   detail.net = Math.round((detail.correct - deduction * detail.wrong) * 100) / 100;
   detail.percent = questions.length ? Math.round(100 * detail.net / questions.length) : 0;
   return detail;
+}
+
+export function mockTopicBreakdown(questions, answers) {
+  const groups = new Map();
+  for (const question of questions) {
+    if (!groups.has(question.topic)) groups.set(question.topic, { topic: question.topic, total: 0, attempted: 0, correct: 0, wrong: 0, skipped: 0 });
+    const group = groups.get(question.topic);
+    group.total++;
+    if (!Object.hasOwn(answers, question.id)) group.skipped++;
+    else {
+      group.attempted++;
+      if (Number(answers[question.id]) === question.answer) group.correct++;
+      else group.wrong++;
+    }
+  }
+  return [...groups.values()].map(group => ({ ...group, accuracy: group.attempted ? Math.round(100 * group.correct / group.attempted) : null })).sort((a,b) => (a.accuracy ?? -1)-(b.accuracy ?? -1));
 }

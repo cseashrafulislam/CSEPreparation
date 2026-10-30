@@ -4,7 +4,8 @@ import { DISCOVERY_ITEMS, DISCOVERY_LAST_RUN, DISCOVERY_FEEDS_OK } from "./data/
 import { questions, writtenQuestions, topics } from "./data/questions.js";
 import { EXAM_TRACKS, UNITS, UNIT_BY_ID, trackTopics } from "./data/curriculum.js";
 import { LABS, LAB_KINDS } from "./data/labs.js";
-import { nextReview, dueQuestionIds, topicAnalytics, recommendedTopics, createBalancedMock, scoreWithPenalty } from "./preparation-core.js";
+import { nextReview, dueQuestionIds, topicAnalytics, recommendedTopics, createBalancedMock, scoreWithPenalty, mockTopicBreakdown } from "./preparation-core.js";
+import { mergePrevious, PREVIOUS_TEMPLATE } from "./previous-core.js";
 
 const questionsById = new Map(questions.map(q => [q.id, q]));
 const labsById = new Map(LABS.map(lab => [lab.id, lab]));
@@ -14,18 +15,19 @@ let state = loadState();
 const ui = {
   jobSearch: "", jobSector: "All", jobStatus: "All", showExpired: false,
   practiceTopic: "All", practiceMode: "All", practiceIndex: 0, practiceDifficulty: "All", practiceSearch: "",
-  writtenTopic: "All", writtenSearch: "", expandedWritten: new Set(),
+  practiceSource: "All", writtenTopic: "All", writtenSearch: "", writtenPage: 0, expandedWritten: new Set(),
   academyTopic: "All", academyOpen: null,
-  labKind: "All", labLevel: "All", labSearch: "", labId: LABS[0]?.id, labHint: false, labSolution: false,
-  mockReviewId: null, installPrompt: null
+  labKind: "All", labLevel: "All", labSearch: "", labPage: 0, labId: LABS[0]?.id, labHint: false, labSolution: false,
+  previousSearch: "", previousType: "All", previousPage: 0,
+  mockReviewId: null, mockTrack: state.trackId, installPrompt: null
 };
 let timerHandle = null;
 let toastHandle = null;
-const routes = new Set(["dashboard", "circulars", "academy", "practice", "lab", "written", "syllabus", "mock", "analytics", "notes"]);
+const routes = new Set(["dashboard", "circulars", "academy", "practice", "lab", "written", "previous", "syllabus", "mock", "analytics", "notes"]);
 const routeNames = {
   dashboard: "ড্যাশবোর্ড", circulars: "চাকরির সার্কুলার", practice: "MCQ প্র্যাকটিস",
   academy: "বিষয়ভিত্তিক পড়াশোনা", lab: "Coding & SQL Lab", analytics: "অগ্রগতি ও দুর্বলতা",
-  written: "Written প্রস্তুতি", syllabus: "পরীক্ষার রোডম্যাপ", mock: "মডেল টেস্ট", notes: "নোট ও ব্যাকআপ"
+  written: "Written প্রস্তুতি", previous: "বিগত পরীক্ষার আর্কাইভ", syllabus: "পরীক্ষার রোডম্যাপ", mock: "মডেল টেস্ট", notes: "নোট ও ব্যাকআপ"
 };
 const byId = id => document.getElementById(id);
 const labelDate = iso => new Intl.DateTimeFormat("bn-BD", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Dhaka" }).format(new Date(`${iso}T00:00:00Z`));
@@ -120,7 +122,7 @@ function renderDashboard() {
       <div class="hero-illustration" aria-hidden="true"><div class="code-tile"><span>function <b>success</b>() {</span><br><span> &nbsp;<i>practice</i>.daily();</span><br><span> &nbsp;return <b>career</b>;</span><br><span>}</span></div></div>
     </section>
     <div class="stats-grid">
-      ${stat("MCQ অনুশীলন", questions.length, "▦", `${questions.filter(q => q.sourceKind === "Original concept/scenario").length} original + ${questions.filter(q => q.sourceKind === "Numerical drill variant").length} drill variants`)}
+      ${stat("MCQ অনুশীলন", questions.length.toLocaleString("en-US"), "▦", `${questions.filter(q => q.sourceKind === "Original concept/scenario").length} authored + ${questions.filter(q => q.sourceKind === "Numerical drill variant").length.toLocaleString("en-US")} numerical scenario variants`)}
       ${stat("আজ প্র্যাকটিস", todayCount, "✎", `দৈনিক লক্ষ্য ${state.dailyGoal}টি`, "green")}
       ${stat("সঠিক উত্তর", answered.length ? `${percent(right, answered.length)}%` : "—", "◎", `${right}/${answered.length}টি উত্তর সঠিক`, "purple")}
       ${stat("Practical Lab", `${Object.values(state.labResults).filter(r => r === "solved").length}/${LABS.length}`, "⌘", "Coding · SQL · Analytical", "orange")}
@@ -243,6 +245,10 @@ function renderLab() {
   if (!filtered.some(lab => lab.id === ui.labId)) ui.labId = filtered[0]?.id || null;
   const lab = labsById.get(ui.labId);
   const done = LABS.filter(item => state.labResults[item.id] === "solved").length;
+  const pageSize = 35;
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  ui.labPage = Math.max(0, Math.min(pages - 1, ui.labPage));
+  const labPage = filtered.slice(ui.labPage * pageSize, (ui.labPage + 1) * pageSize);
   return `${section("Coding, SQL & Analytical Lab", "বাস্তব সমস্যা সমাধান লিখে অনুশীলন করুন। উত্তর নিজের browser-এ থাকবে; এখানে code execute বা auto-grade করা হয় না।")}
     <div class="stats-grid compact-stats">${stat("মোট Lab", LABS.length, "⌘", "Original problems")}${stat("Solved", done, "✓", "Self-assessed", "green")}${stat("Revision needed", Object.values(state.labResults).filter(v => v === "retry").length, "↻", "Reattempt these", "orange")}${stat("Draft saved", Object.values(state.labDrafts).filter(Boolean).length, "▧", "Browser-local", "purple")}</div>
     <div class="toolbar"><label class="search-box"><input class="input" id="lab-search" type="search" placeholder="Problem, topic বা keyword..." value="${h(ui.labSearch)}" aria-label="Search exercises"></label>
@@ -250,9 +256,10 @@ function renderLab() {
       <select class="select" id="lab-level"><option value="All">সব difficulty</option>${["Medium", "Hard"].map(level => `<option value="${level}"${ui.labLevel === level ? " selected" : ""}>${level}</option>`).join("")}</select>
       <span class="badge">${filtered.length} problems</span></div>
     ${lab ? `<div class="lab-layout"><aside class="panel lab-picker"><div class="panel-header"><h3>Problem list</h3><span class="subtle">${filtered.length}টি</span></div>
-      <div class="lab-list">${filtered.map((item, index) => `<button class="lab-list-item ${item.id === lab.id ? "active" : ""}" data-action="lab-open" data-id="${item.id}"><span class="lab-index">${index + 1}</span><span><strong>${h(item.title)}</strong><small>${h(item.kind)} · ${h(item.difficulty)}</small></span><span>${state.labResults[item.id] === "solved" ? "✓" : state.labResults[item.id] === "retry" ? "↻" : ""}</span></button>`).join("")}</div></aside>
+      <div class="lab-list">${labPage.map((item, index) => `<button class="lab-list-item ${item.id === lab.id ? "active" : ""}" data-action="lab-open" data-id="${item.id}"><span class="lab-index">${ui.labPage * pageSize + index + 1}</span><span><strong>${h(item.title)}</strong><small>${h(item.kind)} · ${h(item.difficulty)}</small></span><span>${state.labResults[item.id] === "solved" ? "✓" : state.labResults[item.id] === "retry" ? "↻" : ""}</span></button>`).join("")}</div>
+      <div class="pager"><button class="button small" data-action="lab-page" data-step="-1" ${ui.labPage === 0 ? "disabled" : ""}>← Prev</button><span>${ui.labPage + 1}/${pages}</span><button class="button small" data-action="lab-page" data-step="1" ${ui.labPage === pages - 1 ? "disabled" : ""}>Next →</button></div></aside>
       <article class="panel lab-work"><div class="question-top"><span class="badge">${h(lab.kind)} · ${h(lab.topic)} · ${h(lab.difficulty)}</span><span class="subtle">${h(lab.id)}</span></div>
-        <h2>${h(lab.title)}</h2><p class="lab-prompt">${h(lab.prompt)}</p>
+        <h2>${h(lab.title)}</h2><p class="lab-prompt">${h(lab.prompt)}</p>${lab.sourceKind ? `<p class="caption">${h(lab.sourceKind)}</p>` : ""}
         <div class="lab-toolrow"><button class="button small" data-action="lab-hint">${ui.labHint ? "Hide hint −" : "Get hint +"}</button><button class="button small" data-action="lab-solution">${ui.labSolution ? "Hide reference −" : "Show reference solution +"}</button></div>
         ${ui.labHint ? `<div class="hint-box"><strong>Hint</strong><p>${h(lab.hint)}</p></div>` : ""}
         <form id="lab-form" data-lab-id="${lab.id}"><label class="form-field"><strong>নিজের সমাধান / code / SQL</strong><textarea class="textarea code-entry" name="solution" maxlength="10000" placeholder="এখানে নিজে সমাধান লিখুন। Save Draft চাপলে এই device-এ সংরক্ষণ হবে...">${h(state.labDrafts[lab.id] || "")}</textarea></label>
@@ -269,6 +276,8 @@ function filteredQuestions() {
   return questions.filter(q => {
     if (ui.practiceTopic !== "All" && q.topic !== ui.practiceTopic) return false;
     if (ui.practiceDifficulty !== "All" && q.difficulty !== ui.practiceDifficulty) return false;
+    if (ui.practiceSource === "Authored" && q.sourceKind !== "Original concept/scenario") return false;
+    if (ui.practiceSource === "Variant" && q.sourceKind !== "Numerical drill variant") return false;
     if (search && !`${q.topic} ${q.prompt}`.toLocaleLowerCase().includes(search)) return false;
     const answer = state.answers[q.id];
     if (ui.practiceMode === "Unanswered") return !answer;
@@ -289,6 +298,7 @@ function renderPractice() {
   const toolbar = `<div class="toolbar"><label class="search-box"><input class="input" type="search" id="practice-search" placeholder="প্রশ্ন খুঁজুন..." aria-label="Search questions" value="${h(ui.practiceSearch)}"></label>
     <select class="select" id="practice-topic" aria-label="প্রশ্নের বিষয়"><option value="All">সব বিষয়</option>${topics.map(t => `<option value="${h(t)}"${ui.practiceTopic === t ? " selected" : ""}>${h(t)}</option>`).join("")}</select>
     <select class="select" id="practice-difficulty" aria-label="Difficulty"><option value="All">সব লেভেল</option>${["Easy", "Medium", "Hard"].map(level => `<option value="${level}"${ui.practiceDifficulty === level ? " selected" : ""}>${level}</option>`).join("")}</select>
+    <select class="select" id="practice-source" aria-label="Question origin"><option value="All">Original + Variants</option><option value="Authored"${ui.practiceSource === "Authored" ? " selected" : ""}>Authored concepts</option><option value="Variant"${ui.practiceSource === "Variant" ? " selected" : ""}>Numerical scenarios</option></select>
     <select class="select" id="practice-mode" aria-label="প্রশ্নের ধরন"><option value="All">সব প্রশ্ন</option><option value="Unanswered"${ui.practiceMode === "Unanswered" ? " selected" : ""}>Unanswered</option><option value="Wrong"${ui.practiceMode === "Wrong" ? " selected" : ""}>Wrong answers</option><option value="Due"${ui.practiceMode === "Due" ? " selected" : ""}>Due for revision</option><option value="Bookmarked"${ui.practiceMode === "Bookmarked" ? " selected" : ""}>Bookmarked</option></select>
     <span class="badge">${list.length} questions</span>
   </div>`;
@@ -317,16 +327,39 @@ function renderPractice() {
 function renderWritten() {
   const search = ui.writtenSearch.trim().toLocaleLowerCase();
   const list = writtenQuestions.filter(q => (ui.writtenTopic === "All" || q.topic === ui.writtenTopic) && (!search || `${q.topic} ${q.prompt}`.toLocaleLowerCase().includes(search)));
+  const pageSize = 20;
+  const pages = Math.max(1, Math.ceil(list.length / pageSize));
+  ui.writtenPage = Math.max(0, Math.min(ui.writtenPage, pages - 1));
+  const page = list.slice(ui.writtenPage * pageSize, (ui.writtenPage + 1) * pageSize);
   return `${section("Technical & General Written", "প্রথমে সময় ধরে নিজের উত্তর লিখুন; পরে reference answer মিলিয়ে self-assess করুন।")}
-    <div class="info-banner"><b>✎</b><p>এগুলো নিজস্ব প্রস্তুতিমূলক প্রশ্ন ও নমুনা উত্তর; কোনো প্রতিষ্ঠানের আসল বা ফাঁস হওয়া প্রশ্নপত্র নয়।</p></div>
-    <div class="toolbar"><label class="search-box"><input class="input" id="written-search" type="search" placeholder="Written প্রশ্ন খুঁজুন..." value="${h(ui.writtenSearch)}" aria-label="Search written"></label><select class="select" id="written-topic" aria-label="Written subject"><option value="All">সব বিষয়</option>${[...new Set(writtenQuestions.map(q => q.topic))].map(t => `<option value="${h(t)}"${ui.writtenTopic === t ? " selected" : ""}>${h(t)}</option>`).join("")}</select><span class="badge">${state.writtenDone.length}/${writtenQuestions.length}টি পড়া হয়েছে</span></div>
-    <div class="written-list">${list.map(q => `<article class="written-item"><div class="written-head"><div><span>${h(q.topic)} · ${h(q.id.toUpperCase())}</span><strong>${h(q.prompt)}</strong></div><div class="written-actions">
+    <div class="info-banner"><b>✎</b><p>এখানে নিজস্ব রচনামূলক প্রশ্ন, concept-based designs এবং parameterized worked numericals আছে। এগুলো official previous paper নয়। একাধিক গ্রহণযোগ্য solution থাকলে নমুনা উত্তরকে নির্দেশনা হিসেবে নিন।</p></div>
+    <div class="toolbar"><label class="search-box"><input class="input" id="written-search" type="search" placeholder="Written প্রশ্ন খুঁজুন..." value="${h(ui.writtenSearch)}" aria-label="Search written"></label><select class="select" id="written-topic" aria-label="Written subject"><option value="All">সব বিষয়</option>${[...new Set(writtenQuestions.map(q => q.topic))].map(t => `<option value="${h(t)}"${ui.writtenTopic === t ? " selected" : ""}>${h(t)}</option>`).join("")}</select><span class="badge">${state.writtenDone.length}/${writtenQuestions.length}টি পড়া হয়েছে</span><span class="badge">${list.length} matched</span></div>
+    <div class="written-list">${page.map(q => `<article class="written-item"><div class="written-head"><div><span>${h(q.topic)} · ${h(q.id.toUpperCase())} ${q.sourceKind ? `· ${h(q.sourceKind)}` : ""}</span><strong>${h(q.prompt)}</strong></div><div class="written-actions">
       <button class="button small ${state.writtenDone.includes(q.id) ? "selected" : ""}" data-action="written-done" data-id="${q.id}">${state.writtenDone.includes(q.id) ? "✓ Studied" : "Mark studied"}</button>
       <button class="button small" data-action="written-toggle" data-id="${q.id}">${ui.expandedWritten.has(q.id) ? "Close −" : "Write & Review +"}</button>
     </div></div>${ui.expandedWritten.has(q.id) ? `<div class="written-answer">
       <form class="written-form" data-written-id="${q.id}"><label class="form-field"><strong>নিজের উত্তর (সময় ধরে লিখুন)</strong><textarea class="textarea code-entry" name="draft" maxlength="10000" placeholder="নিজের ভাষায় উত্তর লিখুন...">${h(state.writtenDrafts[q.id] || "")}</textarea></label><button class="button small primary mt" type="submit">Save answer</button></form>
-      <details class="reference-answer mt"><summary>Reference answer মিলিয়ে দেখুন</summary><p>${h(q.answer)}</p><small>${h(q.bn)}</small></details>
-      <div class="lab-assessment"><strong>Self assessment:</strong><div class="heading-actions mt"><button class="button small ${state.writtenResults[q.id] === "solved" ? "selected" : ""}" data-action="written-rate" data-id="${q.id}" data-rating="solved">✓ Satisfactory</button><button class="button small ${state.writtenResults[q.id] === "retry" ? "selected" : ""}" data-action="written-rate" data-id="${q.id}" data-rating="retry">↻ Rewrite needed</button></div></div></div>` : ""}</article>`).join("") || '<div class="empty">এই ফিল্টারে কোনো Written প্রশ্ন নেই।</div>'}</div>`;
+      <details class="reference-answer mt"><summary>Reference answer মিলিয়ে দেখুন</summary><p>${h(q.answer)}</p><small>${h(q.bn)}</small>${q.rubric ? `<ul>${q.rubric.map(item => `<li>${h(item)}</li>`).join("")}</ul>` : ""}</details>
+      <div class="lab-assessment"><strong>Self assessment:</strong><div class="heading-actions mt"><button class="button small ${state.writtenResults[q.id] === "solved" ? "selected" : ""}" data-action="written-rate" data-id="${q.id}" data-rating="solved">✓ Satisfactory</button><button class="button small ${state.writtenResults[q.id] === "retry" ? "selected" : ""}" data-action="written-rate" data-id="${q.id}" data-rating="retry">↻ Rewrite needed</button></div></div></div>` : ""}</article>`).join("") || '<div class="empty">এই ফিল্টারে কোনো Written প্রশ্ন নেই।</div>'}</div><div class="pager"><button class="button" data-action="written-page" data-step="-1" ${ui.writtenPage === 0 ? "disabled" : ""}>← Previous</button><strong>Page ${ui.writtenPage + 1}/${pages}</strong><button class="button" data-action="written-page" data-step="1" ${ui.writtenPage === pages - 1 ? "disabled" : ""}>Next →</button></div>`;
+}
+
+function renderPrevious() {
+  const search = ui.previousSearch.trim().toLocaleLowerCase();
+  const list = state.previousQuestions.filter(q => (ui.previousType === "All" || q.type === ui.previousType) && (!search || `${q.organization} ${q.examName} ${q.topic} ${q.year} ${q.question}`.toLocaleLowerCase().includes(search)));
+  const pageSize = 15, pages = Math.max(1, Math.ceil(list.length / pageSize));
+  ui.previousPage = Math.max(0, Math.min(ui.previousPage, pages - 1));
+  const page = list.slice(ui.previousPage * pageSize, (ui.previousPage + 1) * pageSize);
+  return `${section("Previous Question Bank", "আসল বিগত প্রশ্নপত্রের উৎস-লিংকসহ ব্যক্তিগত আর্কাইভ। যাচাই না-করা প্রশ্নকে official paper বলা হবে না।")}
+    <div class="info-banner"><b>!</b><p><strong>এখনো পূর্ববর্তী পরীক্ষার কোনো authenticated paper bundled নেই।</strong> PDF/বিগত প্রশ্নের অনুমোদিত উৎস থেকে নিজে যাচাই করে JSON ফাইলে প্রশ্ন সাজিয়ে Import করতে পারেন। Import করা প্রশ্নও <strong>user supplied, independently unverified</strong> হিসেবে চিহ্নিত থাকবে। কোনো BUET, BPSC বা নিয়োগকারীর অনুমোদন দাবি করা হয় না।</p></div>
+    <div class="stats-grid compact-stats">${stat("Imported questions", state.previousQuestions.length, "▤", "Browser-local", "purple")}${stat("MCQ papers", state.previousQuestions.filter(q=>q.type==="MCQ").length, "▦", "Source links required")}${stat("Written papers", state.previousQuestions.filter(q=>q.type==="Written").length, "✎", "Archive references")}${stat("Reviewed", state.previousDone.length, "✓", "Your own progress", "green")}</div>
+    <section class="panel"><div class="panel-header"><div><h3>Source-backed import</h3><p class="panel-subtitle">আগে Template download → official উৎস থেকে প্রশ্ন পূরণ → JSON import</p></div><div class="heading-actions"><button class="button soft" data-action="previous-template">↓ JSON template</button><button class="button primary" data-action="previous-import">↑ Import JSON</button></div></div>
+      <p class="side-tip">প্রতিটি প্রশ্নে organization, examName, year, type (MCQ/Written), topic, question এবং HTTPS sourceUrl থাকতে হবে। MCQ হলে ৪টি options ও 0–3 answer index লাগবে। আপনার তথ্য এই ব্রাউজারেই থাকে; অন্য ডিভাইসে নিতে Backup/Restore করুন।</p></section>
+    <div class="toolbar"><label class="search-box"><input id="previous-search" class="input" type="search" aria-label="Previous questions" placeholder="Board, exam, year, subject..." value="${h(ui.previousSearch)}"></label><select id="previous-type" class="select"><option value="All">সব ধরন</option><option value="MCQ"${ui.previousType==="MCQ"?" selected":""}>MCQ</option><option value="Written"${ui.previousType==="Written"?" selected":""}>Written</option></select><span class="badge">${list.length} matched</span></div>
+    <div class="written-list">${page.length ? page.map(q => `<article class="written-item"><div class="written-head"><div><span>${h(q.organization)} · ${h(q.examName)} · ${q.year} · ${h(q.type)} · ${h(q.topic)}</span><strong>${h(q.question)}</strong></div><button class="button small danger" data-action="previous-delete" data-id="${h(q.id)}">Delete</button></div><div class="written-answer"><p class="caption">User imported; source has not been independently authenticated.</p>
+    ${q.options ? `<ol class="previous-options">${q.options.map(opt => `<li>${h(opt)}</li>`).join("")}</ol>` : ""}
+    <details class="reference-answer"><summary>Imported answer</summary><p>${q.type==="MCQ" ? `Option ${String.fromCharCode(65+q.answer)}: ${h(q.options?.[q.answer]||"")}` : h(q.explanation||"No model answer supplied")}</p>${q.type==="MCQ" ? `<p>${h(q.explanation||"")}</p>` : ""}</details>
+    <div class="heading-actions mt"><a class="button small" href="${h(safeHttps(q.sourceUrl))}" target="_blank" rel="noopener noreferrer">Source link ↗</a><button class="button small ${state.previousDone.includes(q.id)?"selected":""}" data-action="previous-reviewed" data-id="${h(q.id)}">${state.previousDone.includes(q.id)?"✓ Reviewed":"Mark reviewed"}</button></div></div></article>`).join("") : '<div class="empty"><strong>কোনো পূর্ববর্তী প্রশ্ন যোগ করা হয়নি</strong><p>উৎস যাচাই করে Template দিয়ে Import করুন; কল্পিত বা অসত্য “Previous Questions” যুক্ত করা হয়নি।</p></div>'}</div>
+    <div class="pager"><button class="button" data-action="previous-page" data-step="-1"${ui.previousPage===0?" disabled":""}>← Prev</button><span>${ui.previousPage+1}/${pages}</span><button class="button" data-action="previous-page" data-step="1"${ui.previousPage===pages-1?" disabled":""}>Next →</button></div>`;
 }
 
 function renderSyllabus() {
@@ -419,12 +452,15 @@ function startMock() {
   const minutes = Number(byId("mock-minutes")?.value || 60);
   const focus = byId("mock-focus")?.value || "All";
   const difficulty = byId("mock-difficulty")?.value || "All";
+  const source = byId("mock-source")?.value || "All";
+  const trackId = byId("mock-track")?.value || state.trackId;
+  ui.mockTrack = trackId;
   const penalty = Number(byId("mock-penalty")?.value || 0);
-  const selected = createBalancedMock(questions, { count, focus, difficulty, trackId: state.trackId });
+  const selected = createBalancedMock(questions, { count, focus, difficulty, trackId, source });
   if (!selected.length) { toast("এই ফিল্টারে মক পরীক্ষার প্রশ্ন নেই। ট্র্যাক বা লেভেল বদলান।"); return; }
   state.activeMock = {
     ids: selected.map(q => q.id),
-    answers: {}, index: 0, startedAt: Date.now(), minutes, penalty, focus, difficulty, trackId: state.trackId
+    answers: {}, index: 0, startedAt: Date.now(), minutes, penalty, focus, difficulty, source, trackId
   };
   ui.mockReviewId = null;
   save();
@@ -440,6 +476,7 @@ function finishMock(expired = false) {
   const attempt = {
     id: `attempt-${Date.now()}`, at: new Date().toISOString(),
     ids: mock.ids, answers: mock.answers, minutes: mock.minutes, penalty: mock.penalty || 0,
+    trackId: mock.trackId, focus: mock.focus, difficulty: mock.difficulty, source: mock.source,
     wrong: score.wrong, skipped: score.skipped, net: score.net,
     score: score.correct, total: score.total, percent: score.percent,
     expired
@@ -478,22 +515,27 @@ function renderMock() {
   }
   const selectedAttempt = state.attempts.find(a => a.id === ui.mockReviewId);
   if (selectedAttempt) {
-    const review = selectedAttempt.ids.map(id => questionsById.get(id)).filter(Boolean).map((q, i) => {
+    const reviewedQuestions = selectedAttempt.ids.map(id => questionsById.get(id)).filter(Boolean);
+    const breakdown = mockTopicBreakdown(reviewedQuestions, selectedAttempt.answers);
+    const review = reviewedQuestions.map((q, i) => {
       const answer = selectedAttempt.answers[q.id];
       const done = Object.hasOwn(selectedAttempt.answers, q.id);
       const correct = done && answer === q.answer;
       return `<div class="review-item"><span class="badge ${correct ? "open" : "review"}">Q${i + 1} · ${correct ? "Correct" : done ? "Incorrect" : "Unanswered"}</span><p><strong>${h(q.prompt)}</strong></p><p>আপনার উত্তর: ${done ? h(q.options[answer]) : "Skipped"}</p><p>সঠিক: <strong>${h(q.options[q.answer])}</strong></p><p class="muted">${h(q.bn)}</p></div>`;
     }).join("");
-    return `${head}<div class="result-banner"><span class="eyebrow">EXAM RESULTS</span><strong>${selectedAttempt.score}/${selectedAttempt.total} correct · Net ${selectedAttempt.net ?? selectedAttempt.score}</strong><p>${selectedAttempt.expired ? "সময় শেষ হয়ে টেস্ট জমা হয়েছে" : "আপনি টেস্ট জমা দিয়েছেন"} · ${new Date(selectedAttempt.at).toLocaleString("bn-BD", { timeZone: "Asia/Dhaka" })}</p><p>${selectedAttempt.wrong ?? "—"} wrong · ${selectedAttempt.skipped ?? "—"} skipped · Wrong প্রতি ${selectedAttempt.penalty ?? 0} নম্বর কর্তন (এই মকে)</p></div>
-      <div class="heading-actions mb"><button class="button primary" data-action="mock-new">+ New Test</button><button class="button" data-action="goto" data-target="practice">Topic Practice →</button></div><section class="panel"><h3>উত্তর ও ব্যাখ্যা</h3>${review}</section>`;
+    return `${head}<div class="result-banner"><span class="eyebrow">EXAM RESULTS</span><strong>${selectedAttempt.score}/${selectedAttempt.total} correct · Net ${selectedAttempt.net ?? selectedAttempt.score}</strong><p>${selectedAttempt.expired ? "সময় শেষ হয়ে টেস্ট জমা হয়েছে" : "আপনি টেস্ট জমা দিয়েছেন"} · ${new Date(selectedAttempt.at).toLocaleString("bn-BD", { timeZone: "Asia/Dhaka" })}</p><p>${selectedAttempt.wrong ?? "—"} wrong · ${selectedAttempt.skipped ?? "—"} skipped · Wrong প্রতি ${selectedAttempt.penalty ?? 0} নম্বর কর্তন (এই মকে) · ${h(EXAM_TRACKS.find(t => t.id === selectedAttempt.trackId)?.title || "All-round")}</p></div>
+      <div class="heading-actions mb"><button class="button primary" data-action="mock-new">+ New Test</button><button class="button" data-action="goto" data-target="practice">Topic Practice →</button></div>
+      <section class="panel mb"><h3>Exam-wise subject performance</h3><p class="side-tip">Weak topics প্রথমে দেখানো হয়েছে। Accuracy শুধু চেষ্টা করা MCQ থেকে হিসাব করা; সম্ভাব্য পরীক্ষার স্কোরের নিশ্চয়তা নয়।</p><div class="analytics-table"><div class="analytics-head"><strong>Topic</strong><span>Correct</span><span>Wrong</span><span>Accuracy</span></div>${breakdown.map(g => `<div class="analytics-row"><strong>${h(g.topic)}</strong><span>${g.correct}/${g.total}</span><span>${g.wrong}</span><span>${g.accuracy===null?"—":`${g.accuracy}%`}</span></div>`).join("")}</div></section>
+      <section class="panel"><h3>উত্তর ও ব্যাখ্যা</h3>${review}</section>`;
   }
   return `${head}<div class="section-grid"><section class="panel"><div class="eyebrow">EXAM SIMULATOR</div><h2>শুরু করুন আপনার পরের পরীক্ষা</h2><p class="side-tip">বিষয়ভিত্তিক balanced random question selection, difficulty, সময় ও optional negative marking। আসল পরীক্ষার নিয়ম মিলিয়ে সেটিং বাছুন।</p>
     <div class="mock-setup"><div class="form-field"><label for="mock-count">প্রশ্ন সংখ্যা</label><select class="select" id="mock-count"><option>10</option><option>20</option><option selected>50</option><option>100</option><option>200</option></select></div>
     <div class="form-field"><label for="mock-minutes">সময় (মিনিট)</label><select class="select" id="mock-minutes"><option>10</option><option>25</option><option>45</option><option selected>60</option><option>90</option><option>120</option><option>180</option></select></div>
     <div class="form-field"><label for="mock-focus">বিষয়</label><select class="select" id="mock-focus"><option value="All">Technical + General</option><option value="Technical">Technical only</option><option value="General">General only</option></select></div>
     <div class="form-field"><label for="mock-difficulty">Difficulty</label><select class="select" id="mock-difficulty"><option value="All">Balanced: Easy–Hard</option><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
+    <div class="form-field"><label for="mock-source">Question quality group</label><select class="select" id="mock-source"><option value="All">Original + Numeric variants</option><option value="Authored">Authored concepts only</option><option value="Variant">Numerical scenarios only</option></select></div>
     <div class="form-field"><label for="mock-penalty">Wrong answer deduction</label><select class="select" id="mock-penalty"><option value="0">None (0)</option><option value="0.25">−0.25</option><option value="0.5">−0.50</option></select></div>
-    <div class="form-field"><label>Study track</label><p class="side-tip">${h(EXAM_TRACKS.find(t => t.id === state.trackId)?.title || "সমন্বিত CSE/IT")} · <a class="link-action" href="#syllabus">Change track</a></p></div></div>
+    <div class="form-field"><label for="mock-track">Exam-wise simulation track</label><select class="select" id="mock-track">${EXAM_TRACKS.map(t => `<option value="${t.id}"${t.id === ui.mockTrack ? " selected" : ""}>${h(t.title)}</option>`).join("")}</select></div></div>
     <button class="button primary" data-action="start-mock">Start Exam →</button></section>
     <aside class="stack"><section class="panel"><h3>সাম্প্রতিক ফলাফল</h3>${state.attempts.length ? state.attempts.slice(0, 8).map(a => `<div class="attempt-row"><span><strong>${a.score}/${a.total} · ${a.percent}%</strong><br><small>${new Date(a.at).toLocaleDateString("bn-BD", { timeZone: "Asia/Dhaka" })}</small></span><button class="button small" data-action="review-mock" data-id="${h(a.id)}">Review →</button></div>`).join("") : '<p class="side-tip mt">এখনো কোনো মডেল টেস্ট দেননি।</p>'}</section>
     <section class="panel"><h3>পরীক্ষার কৌশল</h3><p class="side-tip mt">সহজ প্রশ্ন আগে দিন। Negative marking চালু করলে ভুল উত্তর অনুযায়ী নম্বর কাটবে। সঠিক নিয়ম, মোট নম্বর ও সময় নির্দিষ্ট নিয়োগের বিজ্ঞপ্তি থেকে নিন।</p></section></aside></div>`;
@@ -523,7 +565,7 @@ function render() {
     if (link.dataset.nav === current) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   }
-  const views = { dashboard: renderDashboard, circulars: renderCirculars, academy: renderAcademy, practice: renderPractice, lab: renderLab, written: renderWritten, syllabus: renderSyllabus, mock: renderMock, analytics: renderAnalytics, notes: renderNotes };
+  const views = { dashboard: renderDashboard, circulars: renderCirculars, academy: renderAcademy, practice: renderPractice, lab: renderLab, written: renderWritten, previous: renderPrevious, syllabus: renderSyllabus, mock: renderMock, analytics: renderAnalytics, notes: renderNotes };
   byId("app").innerHTML = views[current]();
   applyTheme();
   if (current === "mock" && state.activeMock) {
@@ -565,6 +607,15 @@ function downloadBackup() {
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   toast("Backup ডাউনলোড হয়েছে। ফাইলটি নিরাপদে রাখুন।");
+}
+
+function downloadPreviousTemplate() {
+  const blob = new Blob([JSON.stringify(PREVIOUS_TEMPLATE, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url; link.download = "previous-paper-import-template.json";
+  document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 document.addEventListener("click", event => {
@@ -619,7 +670,7 @@ document.addEventListener("click", event => {
   } else if (action === "practice-next" || action === "practice-prev") {
     ui.practiceIndex += action === "practice-next" ? 1 : -1; render();
   } else if (action === "clear-practice-filter") {
-    ui.practiceMode = "All"; ui.practiceTopic = "All"; ui.practiceDifficulty = "All"; ui.practiceSearch = ""; ui.practiceIndex = 0; render();
+    ui.practiceMode = "All"; ui.practiceTopic = "All"; ui.practiceDifficulty = "All"; ui.practiceSearch = ""; ui.practiceSource = "All"; ui.practiceIndex = 0; render();
   } else if (action === "practice-topic") {
     const topic = button.dataset.topic;
     if (!topics.includes(topic)) return;
@@ -639,6 +690,10 @@ document.addEventListener("click", event => {
   } else if (action === "lab-open") {
     if (!labsById.has(id)) return;
     ui.labId = id; ui.labHint = false; ui.labSolution = false; render();
+  } else if (action === "lab-page") {
+    ui.labPage += Number(button.dataset.step) || 0;
+    ui.labId = filteredLabs()[Math.max(0,ui.labPage)*35]?.id || ui.labId;
+    ui.labHint = false; ui.labSolution = false; render();
   } else if (action === "lab-hint") {
     ui.labHint = !ui.labHint; render();
   } else if (action === "lab-solution") {
@@ -650,6 +705,20 @@ document.addEventListener("click", event => {
     if (ui.expandedWritten.has(id)) ui.expandedWritten.delete(id);
     else ui.expandedWritten.add(id);
     render();
+  } else if (action === "written-page") {
+    ui.writtenPage += Number(button.dataset.step) || 0; ui.expandedWritten.clear(); render();
+  } else if (action === "previous-page") {
+    ui.previousPage += Number(button.dataset.step) || 0; render();
+  } else if (action === "previous-template") downloadPreviousTemplate();
+  else if (action === "previous-import") byId("previous-input").click();
+  else if (action === "previous-reviewed") {
+    if (!state.previousQuestions.some(q => q.id === id)) return;
+    state.previousDone = state.previousDone.includes(id) ? state.previousDone.filter(q => q !== id) : [...state.previousDone, id];
+    save(); render();
+  } else if (action === "previous-delete") {
+    if (!confirm("এই imported previous question মুছে ফেলবেন?")) return;
+    state.previousQuestions = state.previousQuestions.filter(q => q.id !== id);
+    state.previousDone = state.previousDone.filter(q => q !== id); save(); render();
   } else if (action === "written-done") {
     state.writtenDone = state.writtenDone.includes(id) ? state.writtenDone.filter(x => x !== id) : [...state.writtenDone, id];
     save(); render();
@@ -684,12 +753,15 @@ document.addEventListener("click", event => {
 });
 
 document.addEventListener("input", event => {
-  const filters = { "job-search": "jobSearch", "practice-search": "practiceSearch", "written-search": "writtenSearch", "lab-search": "labSearch" };
+  const filters = { "job-search": "jobSearch", "practice-search": "practiceSearch", "written-search": "writtenSearch", "lab-search": "labSearch", "previous-search": "previousSearch" };
   const property = filters[event.target.id];
   if (property) {
     const pos = event.target.selectionStart;
     ui[property] = event.target.value;
     if (property === "practiceSearch") ui.practiceIndex = 0;
+    if (property === "writtenSearch") ui.writtenPage = 0;
+    if (property === "labSearch") ui.labPage = 0;
+    if (property === "previousSearch") ui.previousPage = 0;
     render();
     const next = byId(event.target.id);
     if (next) { next.focus(); next.setSelectionRange(pos, pos); }
@@ -705,11 +777,14 @@ document.addEventListener("change", event => {
   if (id === "practice-topic") { ui.practiceTopic = element.value; ui.practiceIndex = 0; render(); }
   if (id === "practice-mode") { ui.practiceMode = element.value; ui.practiceIndex = 0; render(); }
   if (id === "practice-difficulty") { ui.practiceDifficulty = element.value; ui.practiceIndex = 0; render(); }
-  if (id === "written-topic") { ui.writtenTopic = element.value; render(); }
+  if (id === "practice-source") { ui.practiceSource = element.value; ui.practiceIndex = 0; render(); }
+  if (id === "written-topic") { ui.writtenTopic = element.value; ui.writtenPage = 0; render(); }
+  if (id === "mock-track") { ui.mockTrack = element.value; }
   if (id === "academy-topic") { ui.academyTopic = element.value; render(); }
-  if (id === "track-select") { if (EXAM_TRACKS.some(t => t.id === element.value)) { state.trackId = element.value; save(); render(); } }
-  if (id === "lab-kind") { ui.labKind = element.value; render(); }
-  if (id === "lab-level") { ui.labLevel = element.value; render(); }
+  if (id === "track-select") { if (EXAM_TRACKS.some(t => t.id === element.value)) { state.trackId = element.value; ui.mockTrack = element.value; save(); render(); } }
+  if (id === "previous-type") { ui.previousType = element.value; ui.previousPage = 0; render(); }
+  if (id === "lab-kind") { ui.labKind = element.value; ui.labPage = 0; render(); }
+  if (id === "lab-level") { ui.labLevel = element.value; ui.labPage = 0; render(); }
   if (id === "daily-goal") { state.dailyGoal = Number(element.value); save(); toast("দৈনিক লক্ষ্য পরিবর্তন হয়েছে।"); render(); }
   if (element.matches("#lab-form textarea")) {
     const labId = element.closest("form")?.dataset.labId;
@@ -728,7 +803,7 @@ document.addEventListener("change", event => {
   if (id === "restore-input") {
     const file = element.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { toast("Backup ফাইলটি ২ MB-এর বেশি।"); element.value = ""; return; }
+    if (file.size > 8 * 1024 * 1024) { toast("Backup ফাইলটি ৮ MB-এর বেশি।"); element.value = ""; return; }
     file.text().then(content => {
       const data = JSON.parse(content);
       if (data.app !== "CSE Prep Desk" || !data.state || data.state.version !== 1)
@@ -737,6 +812,18 @@ document.addEventListener("change", event => {
       if (!confirm("বর্তমান local data বদলে backup ফিরিয়ে আনবেন?")) return;
       state = restored; save(); render(); toast("Backup restore সম্পন্ন।");
     }).catch(() => toast("Backup ফাইল পড়া যায়নি বা format ভুল।")).finally(() => { element.value = ""; });
+  }
+  if (id === "previous-input") {
+    const file = element.files?.[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { toast("প্রশ্নের JSON ৩ MB-এর বেশি।"); element.value = ""; return; }
+    file.text().then(content => {
+      const imported = JSON.parse(content);
+      const merged = mergePrevious(state.previousQuestions, imported);
+      if (!confirm(`${merged.length - state.previousQuestions.length}টি নতুন/পরিবর্তিত প্রশ্ন পাওয়া গেছে। সূত্র যাচাই করে Import করবেন?`)) return;
+      state.previousQuestions = merged;
+      save(); ui.previousPage = 0; render(); toast("Previous question archive আপডেট হয়েছে।");
+    }).catch(error => toast(`Import সম্ভব হয়নি: ${String(error.message).slice(0, 135)}`)).finally(() => { element.value = ""; });
   }
 });
 
