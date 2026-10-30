@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { EXAM_TRACKS, UNITS } from "../public/data/curriculum.js";
+import { EXAM_TRACKS, UNITS, trackTopics } from "../public/data/curriculum.js";
 import { MASTER_NOTES } from "../public/data/master-notes.js";
 import { questions, writtenQuestions } from "../public/data/questions.js";
 
@@ -17,6 +17,7 @@ test("all study chapters have distinct, usable worked lessons and recall questio
     assert.ok(unit.checklist.length >= 3 && unit.exercise.length > 20);
   }
   assert.equal(new Set(UNITS.map(u => u.topic)).size, 19);
+  assert.equal(trackTopics("all").length, 19, "The default all-round track must expose every subject");
   assert.ok(EXAM_TRACKS.every(track => track.focus.some(topic => UNITS.some(unit => unit.topic === topic))));
 });
 
