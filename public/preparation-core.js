@@ -61,7 +61,7 @@ export function createBalancedMock(questionBank, options = {}, random = Math.ran
   const pool = questionBank.filter(q =>
     (focus === "All" || q.category === focus) &&
     (difficulty === "All" || q.difficulty === difficulty) &&
-    (source === "All" || (source === "Authored" ? q.sourceKind === "Original concept/scenario" : q.sourceKind === "Numerical drill variant")) &&
+    (source === "All" || (source === "Authored" && q.sourceKind === "Original concept/scenario") || (source === "Structured" && q.sourceKind === "Structured practice variation") || (source === "Variant" && q.sourceKind === "Numerical drill variant")) &&
     preferred.has(q.topic)
   );
   const byTopic = new Map();

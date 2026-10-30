@@ -123,7 +123,7 @@ function renderDashboard() {
       <div class="hero-illustration" aria-hidden="true"><div class="code-tile"><span>function <b>success</b>() {</span><br><span> &nbsp;<i>practice</i>.daily();</span><br><span> &nbsp;return <b>career</b>;</span><br><span>}</span></div></div>
     </section>
     <div class="stats-grid">
-      ${stat("MCQ অনুশীলন", questions.length.toLocaleString("en-US"), "▦", `${questions.filter(q => q.sourceKind === "Original concept/scenario").length} authored + ${questions.filter(q => q.sourceKind === "Numerical drill variant").length.toLocaleString("en-US")} numerical scenario variants`)}
+      ${stat("MCQ অনুশীলন", questions.length.toLocaleString("en-US"), "▦", `${questions.filter(q => q.sourceKind === "Original concept/scenario").length} authored facts/concepts + ${questions.filter(q => q.sourceKind === "Structured practice variation").length.toLocaleString("en-US")} recall variants + ${questions.filter(q => q.sourceKind === "Numerical drill variant").length.toLocaleString("en-US")} numerical drills`)}
       ${stat("আজ প্র্যাকটিস", todayCount, "✎", `দৈনিক লক্ষ্য ${state.dailyGoal}টি`, "green")}
       ${stat("সঠিক উত্তর", answered.length ? `${percent(right, answered.length)}%` : "—", "◎", `${right}/${answered.length}টি উত্তর সঠিক`, "purple")}
       ${stat("Practical Lab", `${Object.values(state.labResults).filter(r => r === "solved").length}/${LABS.length}`, "⌘", "Coding · SQL · Analytical", "orange")}
@@ -289,6 +289,7 @@ function filteredQuestions() {
     if (ui.practiceDifficulty !== "All" && q.difficulty !== ui.practiceDifficulty) return false;
     if (ui.practiceSource === "Authored" && q.sourceKind !== "Original concept/scenario") return false;
     if (ui.practiceSource === "Variant" && q.sourceKind !== "Numerical drill variant") return false;
+    if (ui.practiceSource === "Structured" && q.sourceKind !== "Structured practice variation") return false;
     if (search && !`${q.topic} ${q.prompt}`.toLocaleLowerCase().includes(search)) return false;
     const answer = state.answers[q.id];
     if (ui.practiceMode === "Unanswered") return !answer;
@@ -313,7 +314,7 @@ function renderPractice() {
     <select class="select" id="practice-topic" aria-label="প্রশ্নের বিষয়"><option value="All">সব বিষয়</option>${topics.map(t => `<option value="${h(t)}"${ui.practiceTopic === t ? " selected" : ""}>${h(t)}</option>`).join("")}</select>
     ${subtopicControl}
     <select class="select" id="practice-difficulty" aria-label="Difficulty"><option value="All">সব লেভেল</option>${["Easy", "Medium", "Hard"].map(level => `<option value="${level}"${ui.practiceDifficulty === level ? " selected" : ""}>${level}</option>`).join("")}</select>
-    <select class="select" id="practice-source" aria-label="Question origin"><option value="All">Original + Variants</option><option value="Authored"${ui.practiceSource === "Authored" ? " selected" : ""}>Authored concepts</option><option value="Variant"${ui.practiceSource === "Variant" ? " selected" : ""}>Numerical scenarios</option></select>
+    <select class="select" id="practice-source" aria-label="Question origin"><option value="All">সব প্রশ্ন</option><option value="Authored"${ui.practiceSource === "Authored" ? " selected" : ""}>Original facts / concepts</option><option value="Structured"${ui.practiceSource === "Structured" ? " selected" : ""}>Vocabulary & fact recall</option><option value="Variant"${ui.practiceSource === "Variant" ? " selected" : ""}>Numerical scenarios</option></select>
     <select class="select" id="practice-mode" aria-label="প্রশ্নের ধরন"><option value="All">সব প্রশ্ন</option><option value="Unanswered"${ui.practiceMode === "Unanswered" ? " selected" : ""}>Unanswered</option><option value="Wrong"${ui.practiceMode === "Wrong" ? " selected" : ""}>Wrong answers</option><option value="Due"${ui.practiceMode === "Due" ? " selected" : ""}>Due for revision</option><option value="Bookmarked"${ui.practiceMode === "Bookmarked" ? " selected" : ""}>Bookmarked</option></select>
     <span class="badge">${list.length} questions</span>
   </div>`;
@@ -330,7 +331,7 @@ function renderPractice() {
     return `<div class="topic-chip ${q.topic === t ? "active" : ""}"><span>${h(t)}</span><span>${answered}/${total}</span></div>`;
   }).join("");
   return `${head}${toolbar}<div class="learning-layout"><div>
-    <article class="question-card"><div class="question-top"><span class="badge">${h(q.topic)} · ${h(q.difficulty)} · ${q.sourceKind === "Numerical drill variant" ? "Drill variant" : "Original question"}</span><button class="button small ${state.bookmarks.includes(q.id) ? "selected" : ""}" data-action="bookmark" data-id="${q.id}">${state.bookmarks.includes(q.id) ? "★ Saved" : "☆ Bookmark"}</button></div>
+    <article class="question-card"><div class="question-top"><span class="badge">${h(q.topic)} · ${h(q.difficulty)} · ${q.sourceKind === "Numerical drill variant" ? "Numerical drill" : q.sourceKind === "Structured practice variation" ? "Recall variant" : "Original fact / concept"}</span><button class="button small ${state.bookmarks.includes(q.id) ? "selected" : ""}" data-action="bookmark" data-id="${q.id}">${state.bookmarks.includes(q.id) ? "★ Saved" : "☆ Bookmark"}</button></div>
     <h2>${h(q.prompt)}</h2><div class="options">${options}</div>${explanation}
     <div class="question-bottom"><span class="counter">প্রশ্ন ${ui.practiceIndex + 1} / ${list.length}</span><div class="heading-actions">${answer ? `<button class="button small" data-action="retry" data-id="${q.id}">↺ Retry</button>` : ""}
     <button class="button small" data-action="practice-prev"${ui.practiceIndex === 0 ? " disabled" : ""}>← Previous</button>
@@ -548,7 +549,7 @@ function renderMock() {
     <div class="form-field"><label for="mock-minutes">সময় (মিনিট)</label><select class="select" id="mock-minutes"><option>10</option><option>25</option><option>45</option><option selected>60</option><option>90</option><option>120</option><option>180</option></select></div>
     <div class="form-field"><label for="mock-focus">বিষয়</label><select class="select" id="mock-focus"><option value="All">Technical + General</option><option value="Technical">Technical only</option><option value="General">General only</option></select></div>
     <div class="form-field"><label for="mock-difficulty">Difficulty</label><select class="select" id="mock-difficulty"><option value="All">Balanced: Easy–Hard</option><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
-    <div class="form-field"><label for="mock-source">Question quality group</label><select class="select" id="mock-source"><option value="All">Original + Numeric variants</option><option value="Authored">Authored concepts only</option><option value="Variant">Numerical scenarios only</option></select></div>
+    <div class="form-field"><label for="mock-source">Question quality group</label><select class="select" id="mock-source"><option value="All">All original + practice variants</option><option value="Authored">Authored concepts & facts only</option><option value="Structured">Vocabulary / fact recall only</option><option value="Variant">Numerical scenarios only</option></select></div>
     <div class="form-field"><label for="mock-penalty">Wrong answer deduction</label><select class="select" id="mock-penalty"><option value="0">None (0)</option><option value="0.25">−0.25</option><option value="0.5">−0.50</option></select></div>
     <div class="form-field"><label for="mock-track">Exam-wise simulation track</label><select class="select" id="mock-track">${EXAM_TRACKS.map(t => `<option value="${t.id}"${t.id === ui.mockTrack ? " selected" : ""}>${h(t.title)}</option>`).join("")}</select></div></div>
     <button class="button primary" data-action="start-mock">Start Exam →</button></section>

@@ -28,6 +28,8 @@ test("appended chapters and written tasks preserve existing progress identifiers
   assert.equal(writtenQuestions.length, 1333);
   assert.ok(writtenQuestions.some(q => q.id === "ws001"));
   assert.ok(writtenQuestions.some(q => q.id === "ws082"));
-  assert.equal(questions.length, 12562);
+  assert.equal(questions.length, 16521);
   assert.equal(questions[11979].id, "q11980");
+  assert.equal(questions[12561].id, "q12562");
+  assert.equal(questions[12562].id, "q12563");
 });
