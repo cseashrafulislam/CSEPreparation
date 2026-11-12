@@ -14,7 +14,7 @@ const topicTotals = new Map(topics.map(topic => [topic, questions.filter(q => q.
 
 let state = loadState();
 const ui = {
-  jobSearch: "", jobSector: "All", jobStatus: "All", showExpired: false,
+  jobSearch: "", jobSector: "All", jobStatus: "All", jobCategory: "All", showExpired: false,
   practiceTopic: "All", practiceSubtopic: "All", practiceMode: "All", practiceIndex: 0, practiceDifficulty: "All", practiceSearch: "",
   practiceSource: "All", writtenTopic: "All", writtenSearch: "", writtenPage: 0, expandedWritten: new Set(),
   academyTopic: "All", academySearch: "", academyOpen: null, academyAnswer: null,
@@ -71,8 +71,18 @@ function stat(label, value, icon, detail, tone = "") {
   return `<article class="stat ${tone}"><div class="stat-head"><span>${label}</span><span class="stat-icon">${icon}</span></div><div class="stat-value">${value}</div><div class="stat-foot">${detail}</div></article>`;
 }
 
+function qualifiesForTrack(job, track = "All") {
+  // The 30-seat rule is per individual ANY-subject Honours POST, never the circular total.
+  const cse = job.eligibility === "cse" && Number.isInteger(job.vacancies) && job.vacancies >= 1;
+  const honours = job.eligibility === "honours" && Number.isInteger(job.vacancies) && job.vacancies >= 30;
+  if (track === "CSE") return cse;
+  if (track === "Honours") return honours;
+  return Boolean(job.custom) || cse || honours;
+}
+
 function allJobs() {
-  return [...officialJobs, ...state.customJobs].sort((a, b) => (a.deadline || "").localeCompare(b.deadline || ""));
+  return [...officialJobs.filter(job => qualifiesForTrack(job)), ...state.customJobs]
+    .sort((a, b) => (a.deadline || "").localeCompare(b.deadline || ""));
 }
 
 function jobBadge(job) {
@@ -160,11 +170,11 @@ function renderCirculars() {
   const search = ui.jobSearch.toLocaleLowerCase();
   const discovered = DISCOVERY_ITEMS.filter(job => `${job.title} ${job.publisher}`.toLocaleLowerCase().includes(search));
   let jobs = allJobs().filter(job => {
-    const matchSearch = `${job.title} ${job.organization} ${job.note || ""} ${(job.tags || []).join(" ")}`.toLowerCase().includes(search);
+    const matchSearch = `${job.title} ${job.organization} ${job.qualification || ""} ${job.note || ""} ${(job.tags || []).join(" ")}`.toLowerCase().includes(search);
     const matchSector = ui.jobSector === "All" || job.sector === ui.jobSector;
     const phase = jobPhase(job);
     const matchStatus = ui.jobStatus === "All" || (ui.jobStatus === "Open" && ["open", "urgent"].includes(phase)) || (ui.jobStatus === "Closed" && phase === "closed") || (ui.jobStatus === "Saved" && state.jobStatuses[job.id] && state.jobStatuses[job.id] !== "none");
-    return matchSearch && matchSector && matchStatus && (ui.showExpired || phase !== "closed" || ui.jobStatus === "Closed");
+    return matchSearch && matchSector && matchStatus && qualifiesForTrack(job, ui.jobCategory) && (ui.showExpired || phase !== "closed" || ui.jobStatus === "Closed");
   });
   const card = job => {
     const url = safeHttps(job.url);
@@ -172,8 +182,8 @@ function renderCirculars() {
     const status = state.jobStatuses[job.id] || "none";
     return `<article class="job-card">
       <div class="job-top">${jobLogo(job)}<div class="job-name"><h3>${h(job.title)}</h3><p>${h(job.organization)} <span class="muted">· ${h(job.sector)}</span></p></div>${jobBadge(job)}</div>
-      <div class="job-meta"><span class="job-detail">◷ Deadline: ${labelDate(job.deadline)}</span>${job.vacancies ? `<span class="job-detail">◫ পদ: ${h(job.vacancies)}</span>` : ""}<span class="job-detail">${job.custom ? "✎ আপনার যোগ করা" : "✓ Official source linked"}</span></div>
-      <p class="job-note">${h(job.note || "মূল বিজ্ঞপ্তি দেখে শিক্ষাগত যোগ্যতা, বয়স ও অন্যান্য শর্ত যাচাই করুন।")}</p>
+      <div class="job-meta"><span class="job-detail">◷ শেষ: ${labelDate(job.deadline)}${job.deadlineTime ? `, ${h(job.deadlineTime.slice(0,5))} (BD)` : ""}</span>${job.vacancies ? `<span class="job-detail">◫ এই পদে: ${h(job.vacancies)}টি</span>` : ""}<span class="job-detail">${job.eligibility === "cse" ? "💻 BSc CSE / Engineering" : job.eligibility === "honours" ? "🎓 যেকোনো বিষয়ে অনার্স (৩০+)" : "✎ আপনার যোগ করা"}</span></div>
+      <p class="job-note"><strong>যোগ্যতা:</strong> ${h(job.qualification || "মূল বিজ্ঞপ্তিতে যোগ্যতা দেখুন।")} ${h(job.note || "")}</p>
       <div class="job-footer"><div class="left">
         ${url ? `<a class="button primary small" href="${h(url)}" target="_blank" rel="noopener noreferrer">Apply / Official ↗</a>` : ""}
         ${circularUrl ? `<a class="button small" href="${h(circularUrl)}" target="_blank" rel="noopener noreferrer">Circular ↗</a>` : ""}
@@ -194,20 +204,23 @@ function renderCirculars() {
     <div class="info-banner"><b>!</b><p>এগুলো নিউজ সার্চ থেকে পাওয়া <strong>যাচাই না-করা সূত্র</strong>, নিশ্চিত চাকরির সার্কুলার নয়। ভুয়া নিয়োগ এড়াতে অফিসিয়াল PDF এবং আবেদন পোর্টালের শেষ তারিখ দেখে নিন। প্রতিদিন সকাল আনুমানিক ৭:১৭ (বাংলাদেশ সময়) GitHub Actions নতুন লিংক খোঁজে; বিলম্ব বা উৎস ব্যর্থ হলে তালিকা নাও বদলাতে পারে।</p></div>
     ${ui.jobStatus !== "All" || ui.jobSector !== "All" ? '<p class="side-tip">নতুন খোঁজ দেখতে Status ও Sector ফিল্টার “সব” রাখুন।</p>' : (discovered.length ? `<div class="discovery-grid">${discoveryList}</div><p class="caption mt">খুঁজে পাওয়া ${discovered.length}টির মধ্যে প্রথম ${Math.min(discovered.length, 35)}টি দেখানো হচ্ছে।</p>` : '<p class="side-tip">এখনো নতুন প্রাসঙ্গিক লিংক নেই। অটোমেশন প্রথমবার সফল হলে এখানে দেখাবে।</p>')}
     </section>`;
-  return `${section("CSE Job Circulars", "অফিশিয়ালি যাচাই করা সার্কুলার ও প্রতিদিন স্বয়ংক্রিয়ভাবে পাওয়া নতুন সূত্র।",
+  return `${section("BSc CSE + Honours সরকারি সার্কুলার", "CSE-যোগ্য সব পদ (১টি হলেও) · যেকোনো বিষয়ে ৪ বছরের অনার্স/সমমান গ্রহণ করে এমন পদে ন্যূনতম ৩০টি শূন্যপদ।",
     '<button class="button primary" data-action="add-job">+ সার্কুলার যোগ করুন</button>')}
     <div class="info-banner"><b>ⓘ</b><p>যাচাই করা মূল সার্কুলার সর্বশেষ ${labelDate(JOBS_LAST_CHECKED)}-এ পর্যালোচিত। স্বয়ংক্রিয় সূত্রগুলো আলাদাভাবে “যাচাই বাকি” দেখানো হয়। আবেদন করার আগে সরকারি PDF-তে বয়স, CGPA, সময় ও পদ নিশ্চিত করুন।</p></div>
+    <div class="job-category-tabs" role="group" aria-label="ডিগ্রি অনুসারে চাকরি ফিল্টার">
+      ${[["All","সব যোগ্য পদ"],["CSE","💻 BSc CSE / Engineering (সব শূন্যপদ)"],["Honours","🎓 General Honours (প্রতি পদে ৩০+)"]].map(([id, label]) => `<button type="button" class="button small ${ui.jobCategory === id ? "selected" : "soft"}" data-action="job-category" data-id="${id}" aria-pressed="${ui.jobCategory === id}">${label}</button>`).join("")}
+    </div>
     <div class="toolbar"><label class="search-box"><input class="input" id="job-search" type="search" placeholder="প্রতিষ্ঠান, পদ বা কিওয়ার্ড..." value="${h(ui.jobSearch)}" aria-label="সার্কুলার খুঁজুন"></label>
       <select class="select" id="job-sector" aria-label="খাত"><option value="All">সব খাত</option>${["Government","Semi-government","Bank","NGO","Other"].map(s => `<option value="${s}"${ui.jobSector === s ? " selected" : ""}>${s}</option>`).join("")}</select>
       <select class="select" id="job-filter" aria-label="স্ট্যাটাস"><option value="All">সব স্ট্যাটাস</option>${["Open","Closed","Saved"].map(s => `<option value="${s}"${ui.jobStatus === s ? " selected" : ""}>${s}</option>`).join("")}</select>
       <label class="checkbox-inline"><input id="show-expired" type="checkbox"${ui.showExpired ? " checked" : ""}> Expired দেখুন</label>
     </div>
-    ${discoveryBanner}
     <div class="section-grid"><div><p class="caption">${notice(jobs.length)} যাচাই করা/নিজের সার্কুলার</p><div class="job-list">${jobs.length ? jobs.map(card).join("") : '<div class="empty"><div class="empty-icon">⌕</div><strong>কোনো সার্কুলার পাওয়া যায়নি</strong><p>ফিল্টার বদলে দেখুন অথবা নিজে নতুন সার্কুলার যুক্ত করুন।</p></div>'}</div></div>
     <aside class="stack"><section class="panel"><div class="panel-header"><div><h3>অফিশিয়াল উৎস</h3><p class="panel-subtitle">নতুন Circular খুঁজতে</p></div></div>
       ${sourceLinks.map(link => `<a class="source-link" href="${h(safeHttps(link.url))}" target="_blank" rel="noopener noreferrer"><span>↗</span><span><strong>${h(link.name)}</strong><small>${h(link.detail)}</small></span><span class="arrow">↗</span></a>`).join("")}
-    </section><section class="panel"><h3>আপনার ৩টি গুরুত্বপূর্ণ বিষয়</h3><p class="side-tip mt">বয়স ২৯, BSc CSE (CGPA 3.80) ও ৪+ বছরের অভিজ্ঞতা। তবে প্রতিটি পদের SSC/HSC, বয়সসীমা ও অভিজ্ঞতার শর্ত আলাদাভাবে নিশ্চিত করুন।</p><button class="button soft full" data-action="goto" data-target="practice">প্রস্তুতি শুরু →</button></section>
-    </aside></div>`;
+    </section><section class="panel"><h3>আপনার ফিল্টারের নিয়ম</h3><p class="side-tip mt">CSE-নির্দিষ্ট পদের জন্য শূন্যপদের কোনো সর্বনিম্ন সীমা নেই। যেকোনো বিষয়ে অনার্স গ্রহণযোগ্য হলে শুধু সেই নির্দিষ্ট পদের সংখ্যা ৩০ বা বেশি থাকলেই দেখানো হয়। SSC/HSC ফল, বয়স, অভিজ্ঞতা এবং একাধিক পদে আবেদন নিষেধাজ্ঞা মূল PDF থেকে যাচাই করুন।</p><button class="button soft full" data-action="goto" data-target="practice">প্রস্তুতি শুরু →</button></section>
+    </aside></div>
+    ${ui.jobCategory === "All" ? discoveryBanner : ""}`;
 }
 
 function renderAcademy() {
@@ -649,6 +662,12 @@ document.addEventListener("click", event => {
   const action = button.dataset.action;
   const id = button.dataset.id;
   const index = Number(button.dataset.index);
+  if (action === "job-category") {
+    if (!["All", "CSE", "Honours"].includes(id)) return;
+    ui.jobCategory = id;
+    render();
+    return;
+  }
   if (action === "goto") return go(button.dataset.target);
   if (action === "menu") {
     document.querySelector(".sidebar").classList.toggle("open");
