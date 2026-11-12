@@ -1,4 +1,4 @@
-const VERSION = "cseprep-v11-qualifications-20261112";
+const VERSION = "cseprep-v12-remove-unverified-news-20261112";
 const CORE = [
   "/", "/index.html", "/styles.css", "/app.js", "/core.js", "/preparation-core.js",
   "/data/jobs.js", "/data/discovered.js", "/data/questions.js", "/data/advanced.js", "/data/drills.js",
