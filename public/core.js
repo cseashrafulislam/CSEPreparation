@@ -106,6 +106,16 @@ export function daysRemaining(isoDate, today = bangladeshToday()) {
   return Number.isFinite(date) && Number.isFinite(current) ? Math.round((date - current) / 86400000) : null;
 }
 
+// Academic shortlist only. Full eligibility always depends on the official PDF.
+// A BSc CSE is also a four-year honours/equivalent degree for eligible general roles.
+export function qualifiesForTrack(job, track = "All") {
+  const technical = job.eligibility === "cse" && Number.isInteger(job.vacancies) && job.vacancies >= 1;
+  const general = job.eligibility === "honours" && Number.isInteger(job.vacancies) && job.vacancies >= 30;
+  if (track === "CSE") return technical || general;
+  if (track === "Honours") return general;
+  return Boolean(job.custom) || technical || general;
+}
+
 export function jobPhase(job, today = bangladeshToday(), now = new Date()) {
   const days = daysRemaining(job.deadline, today);
   if (days === null) return "unknown";
