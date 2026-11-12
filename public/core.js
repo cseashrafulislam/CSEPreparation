@@ -113,7 +113,7 @@ export function jobPhase(job, today = bangladeshToday(), now = new Date()) {
   // A deadline can finish during its calendar day, in Bangladesh local time.
   // Explicit 'today' arguments in existing tests/flows retain date-only semantics
   // unless 'now' falls on that same local date.
-  if (days === 0 && /^([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$/.test(job.deadlineTime || "") && today === bangladeshToday(now)) {
+  if (days === 0 && /^([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/.test(job.deadlineTime || "") && today === bangladeshToday(now)) {
     const clock = new Intl.DateTimeFormat("en-GB", {
       timeZone: "Asia/Dhaka", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
     }).format(now);
