@@ -24,3 +24,21 @@ test("RSS index accepts recent CSE recruitment leads and rejects non-hiring head
   assert.ok(!relevantHeadline("Graduate admission results published"));
   assert.ok(feedUrl(FEEDS[0]).startsWith("https://news.google.com/rss/search?"));
 });
+
+test("removed army programmer news lead is rejected on RSS discovery and retained index merge", () => {
+  const title = "বাংলাদেশ সেনাবাহিনীতে সফটওয়ার প্রোগ্রামার পদে চাকরির সুযোগ";
+  assert.equal(relevantHeadline(title), false);
+  assert.equal(relevantHeadline(title + " - প্রথম আলো"), false);
+
+  const entry = {
+    id: "discovery-b5d13cd19f92dfcf",
+    title,
+    url: "https://news.google.com/rss/articles/example",
+    publishedOn: "2026-10-27",
+    verification: "unverified"
+  };
+  assert.deepEqual(mergeDiscoveries([entry], [[entry]], "2026-11-12"), []);
+  // A different URL/hash is also excluded when the identical headline returns.
+  assert.deepEqual(mergeDiscoveries([], [[{ ...entry, id: "discovery-differenthash" }]], "2026-11-12"), []);
+  assert.equal(relevantHeadline("সহকারী প্রোগ্রামার নিয়োগ বিজ্ঞপ্তি"), true);
+});
