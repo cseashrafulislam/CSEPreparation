@@ -113,3 +113,9 @@ body{color:var(--text);background:var(--bg)}button,input,select,textarea{color:v
 .written-answer .reference-answer p,.written-answer .reference-answer small{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:1100px){.lab-layout{grid-template-columns:225px minmax(0,1fr)}}
 @media(max-width:700px){.lab-layout{grid-template-columns:1fr}.lab-picker{position:static;max-height:245px}.lab-work{padding:20px 17px}.unit-grid{grid-template-columns:1fr}.toolbar .form-field{width:100%}.toolbar .form-field .select{width:100%}.compact-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Degree-based circular filters; keep the controls readable on mobile. */
+.job-category-tabs{display:flex;flex-wrap:wrap;gap:9px;margin:4px 0 18px}
+.job-category-tabs .button{height:auto;min-height:39px;text-align:center;white-space:normal;line-height:1.5}
+.job-category-tabs .button.selected{background:var(--primary);color:#fff;border-color:var(--primary)}
+@media(max-width:700px){.job-category-tabs{display:grid;grid-template-columns:1fr;gap:7px}.job-category-tabs .button{width:100%}}
