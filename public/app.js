@@ -182,7 +182,7 @@ function renderCirculars() {
     const status = state.jobStatuses[job.id] || "none";
     return `<article class="job-card">
       <div class="job-top">${jobLogo(job)}<div class="job-name"><h3>${h(job.title)}</h3><p>${h(job.organization)} <span class="muted">· ${h(job.sector)}</span></p></div>${jobBadge(job)}</div>
-      <div class="job-meta"><span class="job-detail">◷ শেষ: ${labelDate(job.deadline)}${job.deadlineTime ? `, ${h(job.deadlineTime.slice(0,5))} (BD)` : ""}</span>${job.vacancies ? `<span class="job-detail">◫ এই পদে: ${h(job.vacancies)}টি</span>` : ""}<span class="job-detail">${job.eligibility === "cse" ? "💻 BSc CSE / Engineering" : job.eligibility === "honours" ? "🎓 যেকোনো বিষয়ে অনার্স (৩০+)" : "✎ আপনার যোগ করা"}</span></div>
+      <div class="job-meta"><span class="job-detail">◷ শেষ: ${labelDate(job.deadline)}${job.deadlineTime ? `, ${h(job.deadlineTime.slice(0,5))} (BD)` : ""}</span>${job.vacancies ? `<span class="job-detail">◫ এই পদে: ${h(job.vacanciesDisplay || job.vacancies)}টি</span>` : ""}<span class="job-detail">${job.eligibility === "cse" ? "💻 BSc CSE / Engineering" : job.eligibility === "honours" ? "🎓 যেকোনো বিষয়ে অনার্স (৩০+)" : "✎ আপনার যোগ করা"}</span>${job.sourceStatus === "count-disputed" ? '<span class="badge urgent">⚠ পদসংখ্যা পুনঃযাচাই করুন</span>' : ""}</div>
       <p class="job-note"><strong>যোগ্যতা:</strong> ${h(job.qualification || "মূল বিজ্ঞপ্তিতে যোগ্যতা দেখুন।")} ${h(job.note || "")}</p>
       <div class="job-footer"><div class="left">
         ${url ? `<a class="button primary small" href="${h(url)}" target="_blank" rel="noopener noreferrer">Apply / Official ↗</a>` : ""}
