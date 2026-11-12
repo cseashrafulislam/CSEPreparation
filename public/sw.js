@@ -1,4 +1,4 @@
-const VERSION = "cseprep-v8-technical-content-20261031";
+const VERSION = "cseprep-v9-dual-degree-circulars-20261112";
 const CORE = [
   "/", "/index.html", "/styles.css", "/app.js", "/core.js", "/preparation-core.js",
   "/data/jobs.js", "/data/discovered.js", "/data/questions.js", "/data/advanced.js", "/data/drills.js",
