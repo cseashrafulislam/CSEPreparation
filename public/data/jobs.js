@@ -47,6 +47,17 @@ export const officialJobs = [
     tags: ["CSE", "Any BSc Engineering", "Technical", "Grade 9"]
   },
   {
+    id: "bpsc-sub-registrar-2026", organization: "BPSC (নন-ক্যাডার)", title: "সাব-রেজিস্ট্রার (ক্রমিক ৮৭)",
+    sector: "Government", eligibility: "honours", vacancies: 48,
+    vacanciesDisplay: "৪৮ (অন্য কপিতে ৮৪)", sourceStatus: "count-disputed",
+    opens: "2026-10-19", deadline: "2026-11-30",
+    url: "https://bpsc.teletalk.com.bd/",
+    circularUrl: "https://bpsc.teletalk.com.bd/ncad/doc/ad_202608.pdf",
+    verifiedOn: "2026-11-12", qualification: "যেকোনো বিষয়ে দ্বিতীয় শ্রেণি/সমমানের CGPAসহ ৪ বছর মেয়াদি অনার্স; অথবা যোগ্য স্নাতক ও স্নাতকোত্তর।",
+    note: "গ্রেড-৯; ৩০+ শর্তে পদটি যোগ্য, কিন্তু অফিসিয়াল PDF-এর সার্চ কপিতে ৪৮ এবং অন্য প্রকাশিত কপিতে ৮৪ পাওয়া গেছে। আবেদন করার আগে মূল PDF-তে সর্বশেষ পদসংখ্যা নিশ্চিত করুন।",
+    tags: ["Honours", "Any subject", "Sub Registrar", "Grade 9", "Count needs reconfirmation"]
+  },
+  {
     id: "bdpost-inspector-2026", organization: "ডাক অধিদপ্তর", title: "ইন্সপেক্টর অব পোস্ট অফিসেস / RMS / PLI / PTC (সমন্বিত)",
     sector: "Government", eligibility: "honours", vacancies: 31,
     opens: "2026-11-10", deadline: "2026-12-10", deadlineTime: "17:00:00",
