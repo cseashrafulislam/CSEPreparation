@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { officialJobs } from "../public/data/jobs.js";
-import { jobPhase, safeHttps } from "../public/core.js";
+import { jobPhase, qualifiesForTrack, safeHttps } from "../public/core.js";
 
 test("curated circulars use a per-position, not organisation-level, vacancy filter", () => {
   assert.equal(new Set(officialJobs.map(job => job.id)).size, officialJobs.length, "unique tracking IDs");
@@ -21,6 +21,16 @@ test("CSE positions can have 1 post, while Honours requires 30 or more per posit
   assert.ok(officialJobs.every(job => job.eligibility === "cse" || job.vacancies >= 30));
   assert.ok(officialJobs.some(job => job.id === "bogmc-am-admin-2026" && job.vacancies === 97));
   assert.ok(officialJobs.some(job => job.id === "bdpost-inspector-2026" && job.vacancies === 31));
+  const general = officialJobs.find(job => job.id === "bdpost-inspector-2026");
+  const oneSeat = officialJobs.find(job => job.id === "bpsc-programmer-2026");
+  assert.equal(qualifiesForTrack(general, "Honours"), true);
+  assert.equal(qualifiesForTrack(general, "CSE"), true, "BSc CSE can apply to eligible any-subject Honours posts");
+  assert.equal(qualifiesForTrack(oneSeat, "CSE"), true);
+  assert.equal(qualifiesForTrack(oneSeat, "Honours"), false);
+  assert.equal(qualifiesForTrack({ eligibility: "honours", vacancies: 29 }, "CSE"), false);
+  assert.equal(qualifiesForTrack({ eligibility: "honours", vacancies: 30 }, "Honours"), true);
+  assert.equal(qualifiesForTrack({ eligibility: "cse", vacancies: 1 }, "CSE"), true);
+
 });
 
 test("local cutoff closes applications on the same Bangladesh calendar date", () => {
