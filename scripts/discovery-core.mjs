@@ -1,5 +1,13 @@
 import { createHash } from "node:crypto";
 
+// Editorial exclusion for the specific previously removed unverified news lead.
+// Prevent reimport when Google News repeats the same link or headline.
+const EXCLUDED_DISCOVERY_IDS = new Set(["discovery-b5d13cd19f92dfcf"]);
+const EXCLUDED_NEWS_TITLE = "বাংলাদেশ সেনাবাহিনীতে সফটওয়ার প্রোগ্রামার পদে চাকরির সুযোগ";
+const isExcludedNews = entry =>
+  EXCLUDED_DISCOVERY_IDS.has(entry.id) ||
+  String(entry.title || "").includes(EXCLUDED_NEWS_TITLE);
+
 export const FEEDS = [
   { language: "bn", query: "প্রোগ্রামার নিয়োগ" },
   { language: "bn", query: '"আইসিটি" "নিয়োগ বিজ্ঞপ্তি" সরকারি' },
@@ -36,6 +44,7 @@ const xmlText = (item, tag) => {
 };
 
 export const relevantHeadline = text => {
+  if (isExcludedNews({ title: text })) return false;
   const technical = /\b(programmer|developer|software engineer|network engineer|ict officer|it officer|information technology|system analyst|computer engineer|database administrator|system administrator|cybersecurity|cyber security|it specialist|ict specialist)\b|প্রোগ্রামার|সফটওয়্যার|আইসিটি|তথ্যপ্রযুক্তি|কম্পিউটার ইঞ্জিনিয়ার|আইটি অফিসার|সিস্টেম এনালিস্ট|নেটওয়ার্ক ইঞ্জিনিয়ার/iu;
   const generalGraduate = /\b(?:graduate|bachelors?|honou?rs|any subject)\b|অনার্স|সম্মান|স্নাতক|যেকোনো বিষয়ে/iu;
   const hiring = /\b(recruitment|recruit|hiring|vacanc(?:y|ies)|job(?:s)?|career|apply|circular|posts?)\b|নিয়োগ|চাকরি|বিজ্ঞপ্তি|শূন্যপদ|আবেদন/iu;
@@ -78,7 +87,7 @@ export function mergeDiscoveries(existing, batches, today, maxItems = 75) {
   const unique = new Map();
   const cutoff = new Date(`${today}T00:00:00Z`).getTime() - 35 * 86400000;
   for (const entry of [...batches.flat(), ...existing]) {
-    if (entry?.verification !== "unverified" || !entry.id || !entry.title || !entry.url) continue;
+    if (entry?.verification !== "unverified" || !entry.id || !entry.title || !entry.url || isExcludedNews(entry)) continue;
     if (Date.parse(`${entry.publishedOn}T00:00:00Z`) < cutoff) continue;
     const key = entry.title.toLowerCase().replace(/[\W_]+/g, " ").trim();
     if (!unique.has(key)) unique.set(key, entry);
