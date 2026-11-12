@@ -32,6 +32,7 @@ if (!batches.length) {
     `// These are third-party news-index leads ONLY, not verified official circulars or application deadlines.\n` +
     `export const DISCOVERY_LAST_RUN = ${JSON.stringify(checkedAt.toISOString())};\n` +
     `export const DISCOVERY_FEEDS_OK = ${batches.length};\n` +
+    `export const DISCOVERY_FEEDS_TOTAL = ${FEEDS.length};\n` +
     `export const DISCOVERY_ITEMS = ${JSON.stringify(jobs, null, 2)};\n`;
   await writeFile(new URL("../public/data/discovered.js", import.meta.url), source, "utf8");
   console.log(`Discovery checked ${batches.length}/${FEEDS.length} feeds; ${jobs.length} candidate listings. ${failures.length} failures.`);
