@@ -2,6 +2,7 @@
 // These are third-party news-index leads ONLY, not verified official circulars or application deadlines.
 export const DISCOVERY_LAST_RUN = "2026-11-12T08:18:30.396Z";
 export const DISCOVERY_FEEDS_OK = 6;
+export const DISCOVERY_FEEDS_TOTAL = 9;
 export const DISCOVERY_ITEMS = [
   {
     "id": "discovery-b5d13cd19f92dfcf",
