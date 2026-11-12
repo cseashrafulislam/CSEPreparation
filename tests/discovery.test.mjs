@@ -18,6 +18,9 @@ test("RSS index accepts recent CSE recruitment leads and rejects non-hiring head
   assert.equal(merged.length, 1);
   assert.ok(relevantHeadline("সরকারি প্রতিষ্ঠানে সহকারী প্রোগ্রামার নিয়োগ বিজ্ঞপ্তি"));
   assert.ok(!relevantHeadline("প্রোগ্রামার নিয়োগ পরীক্ষার ফলাফল প্রকাশ"));
-  assert.equal(FEEDS.length, 6);
+  assert.equal(FEEDS.length, 9);
+  assert.ok(relevantHeadline("যেকোনো বিষয়ে স্নাতক নিয়োগ বিজ্ঞপ্তি"));
+  assert.ok(relevantHeadline("Government graduate honours recruitment circular"));
+  assert.ok(!relevantHeadline("Graduate admission results published"));
   assert.ok(feedUrl(FEEDS[0]).startsWith("https://news.google.com/rss/search?"));
 });
