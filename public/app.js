@@ -1,4 +1,4 @@
-import { STORAGE_KEY, loadState, saveState, normalizeState, bangladeshToday, daysRemaining, jobPhase, escapeHtml as h, safeHttps, validateCustomJob, dailyPracticeCount } from "./core.js";
+import { STORAGE_KEY, loadState, saveState, normalizeState, bangladeshToday, daysRemaining, jobPhase, qualifiesForTrack, escapeHtml as h, safeHttps, validateCustomJob, dailyPracticeCount } from "./core.js";
 import { officialJobs, JOBS_LAST_CHECKED, sourceLinks } from "./data/jobs.js";
 import { DISCOVERY_ITEMS, DISCOVERY_LAST_RUN, DISCOVERY_FEEDS_OK, DISCOVERY_FEEDS_TOTAL } from "./data/discovered.js";
 import { questions, writtenQuestions, topics } from "./data/questions.js";
@@ -69,15 +69,6 @@ function section(title, subtitle, actions = "") {
 
 function stat(label, value, icon, detail, tone = "") {
   return `<article class="stat ${tone}"><div class="stat-head"><span>${label}</span><span class="stat-icon">${icon}</span></div><div class="stat-value">${value}</div><div class="stat-foot">${detail}</div></article>`;
-}
-
-function qualifiesForTrack(job, track = "All") {
-  // The 30-seat rule is per individual ANY-subject Honours POST, never the circular total.
-  const cse = job.eligibility === "cse" && Number.isInteger(job.vacancies) && job.vacancies >= 1;
-  const honours = job.eligibility === "honours" && Number.isInteger(job.vacancies) && job.vacancies >= 30;
-  if (track === "CSE") return cse;
-  if (track === "Honours") return honours;
-  return Boolean(job.custom) || cse || honours;
 }
 
 function allJobs() {
@@ -204,11 +195,11 @@ function renderCirculars() {
     <div class="info-banner"><b>!</b><p>এগুলো CSE ও স্নাতক নিয়োগের নিউজ সার্চ থেকে পাওয়া <strong>যাচাই না-করা সূত্র</strong>, নিশ্চিত চাকরির সার্কুলার নয়। ৩০+ পদ বা CSE যোগ্যতা এখানে অনুমান করা হয় না। ভুয়া নিয়োগ এড়াতে অফিসিয়াল PDF এবং আবেদন পোর্টালের শেষ তারিখ দেখে নিন। প্রতিদিন সকাল আনুমানিক ৭:১৭ (বাংলাদেশ সময়) GitHub Actions নতুন লিংক খোঁজে; বিলম্ব বা উৎস ব্যর্থ হলে তালিকা নাও বদলাতে পারে।</p></div>
     ${ui.jobStatus !== "All" || ui.jobSector !== "All" ? '<p class="side-tip">নতুন খোঁজ দেখতে Status ও Sector ফিল্টার “সব” রাখুন।</p>' : (discovered.length ? `<div class="discovery-grid">${discoveryList}</div><p class="caption mt">খুঁজে পাওয়া ${discovered.length}টির মধ্যে প্রথম ${Math.min(discovered.length, 35)}টি দেখানো হচ্ছে।</p>` : '<p class="side-tip">এখনো নতুন প্রাসঙ্গিক লিংক নেই। অটোমেশন প্রথমবার সফল হলে এখানে দেখাবে।</p>')}
     </section>`;
-  return `${section("BSc CSE + Honours সরকারি সার্কুলার", "CSE-যোগ্য সব পদ (১টি হলেও) · যেকোনো বিষয়ে ৪ বছরের অনার্স/সমমান গ্রহণ করে এমন পদে ন্যূনতম ৩০টি শূন্যপদ।",
+  return `${section("BSc CSE + Honours সরকারি সার্কুলার", "BSc CSE ট্যাবে টেকনিক্যাল সব পদ + যেকোনো বিষয়ে অনার্স গ্রহণ করে এমন ৩০+ পদ। General Honours ট্যাবে শুধু নির্দিষ্ট পদে ৩০+ শূন্যপদ।",
     '<button class="button primary" data-action="add-job">+ সার্কুলার যোগ করুন</button>')}
     <div class="info-banner"><b>ⓘ</b><p>যাচাই করা মূল সার্কুলার সর্বশেষ ${labelDate(JOBS_LAST_CHECKED)}-এ পর্যালোচিত। স্বয়ংক্রিয় সূত্রগুলো আলাদাভাবে “যাচাই বাকি” দেখানো হয়। আবেদন করার আগে সরকারি PDF-তে বয়স, CGPA, সময় ও পদ নিশ্চিত করুন।</p></div>
     <div class="job-category-tabs" role="group" aria-label="ডিগ্রি অনুসারে চাকরি ফিল্টার">
-      ${[["All","সব যোগ্য পদ"],["CSE","💻 BSc CSE / Engineering (সব শূন্যপদ)"],["Honours","🎓 General Honours (প্রতি পদে ৩০+)"]].map(([id, label]) => `<button type="button" class="button small ${ui.jobCategory === id ? "selected" : "soft"}" data-action="job-category" data-id="${id}" aria-pressed="${ui.jobCategory === id}">${label}</button>`).join("")}
+      ${[["All","সব যোগ্য পদ"],["CSE","💻 BSc CSE (টেকনিক্যাল সব + অনার্স ৩০+)"],["Honours","🎓 General Honours (প্রতি পদে ৩০+)"]].map(([id, label]) => `<button type="button" class="button small ${ui.jobCategory === id ? "selected" : "soft"}" data-action="job-category" data-id="${id}" aria-pressed="${ui.jobCategory === id}">${label}</button>`).join("")}
     </div>
     <div class="toolbar"><label class="search-box"><input class="input" id="job-search" type="search" placeholder="প্রতিষ্ঠান, পদ বা কিওয়ার্ড..." value="${h(ui.jobSearch)}" aria-label="সার্কুলার খুঁজুন"></label>
       <select class="select" id="job-sector" aria-label="খাত"><option value="All">সব খাত</option>${["Government","Semi-government","Bank","NGO","Other"].map(s => `<option value="${s}"${ui.jobSector === s ? " selected" : ""}>${s}</option>`).join("")}</select>
@@ -218,7 +209,7 @@ function renderCirculars() {
     <div class="section-grid"><div><p class="caption">${notice(jobs.length)} যাচাই করা/নিজের সার্কুলার</p><div class="job-list">${jobs.length ? jobs.map(card).join("") : '<div class="empty"><div class="empty-icon">⌕</div><strong>কোনো সার্কুলার পাওয়া যায়নি</strong><p>ফিল্টার বদলে দেখুন অথবা নিজে নতুন সার্কুলার যুক্ত করুন।</p></div>'}</div></div>
     <aside class="stack"><section class="panel"><div class="panel-header"><div><h3>অফিশিয়াল উৎস</h3><p class="panel-subtitle">নতুন Circular খুঁজতে</p></div></div>
       ${sourceLinks.map(link => `<a class="source-link" href="${h(safeHttps(link.url))}" target="_blank" rel="noopener noreferrer"><span>↗</span><span><strong>${h(link.name)}</strong><small>${h(link.detail)}</small></span><span class="arrow">↗</span></a>`).join("")}
-    </section><section class="panel"><h3>আপনার ফিল্টারের নিয়ম</h3><p class="side-tip mt">CSE-নির্দিষ্ট পদের জন্য শূন্যপদের কোনো সর্বনিম্ন সীমা নেই। যেকোনো বিষয়ে অনার্স গ্রহণযোগ্য হলে শুধু সেই নির্দিষ্ট পদের সংখ্যা ৩০ বা বেশি থাকলেই দেখানো হয়। SSC/HSC ফল, বয়স, অভিজ্ঞতা এবং একাধিক পদে আবেদন নিষেধাজ্ঞা মূল PDF থেকে যাচাই করুন।</p><button class="button soft full" data-action="goto" data-target="practice">প্রস্তুতি শুরু →</button></section>
+    </section><section class="panel"><h3>আপনার ফিল্টারের নিয়ম</h3><p class="side-tip mt">BSc CSE ট্যাবে CSE/Engineering-যোগ্য পদ ১টি হলেও এবং যেকোনো বিষয়ে অনার্স গ্রহণযোগ্য হলে নির্দিষ্ট পদে ৩০+ শূন্যপদ থাকলে দেখানো হয়। SSC/HSC ফল, বয়স, অভিজ্ঞতা এবং একাধিক পদে আবেদন নিষেধাজ্ঞা মূল PDF থেকে যাচাই করুন।</p><button class="button soft full" data-action="goto" data-target="practice">প্রস্তুতি শুরু →</button></section>
     </aside></div>
     ${ui.jobCategory === "All" ? discoveryBanner : ""}`;
 }
