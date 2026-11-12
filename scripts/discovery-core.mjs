@@ -6,7 +6,12 @@ export const FEEDS = [
   { language: "bn", query: '"সফটওয়্যার ইঞ্জিনিয়ার" "চাকরি" বাংলাদেশ' },
   { language: "en", query: 'Bangladesh "assistant programmer" recruitment circular' },
   { language: "en", query: 'Bangladesh "IT officer" recruitment circular' },
-  { language: "en", query: 'Bangladesh "software engineer" government job circular' }
+  { language: "en", query: 'Bangladesh "software engineer" government job circular' },
+  // Leads only: exact eligibility, position-specific vacancy count and deadline
+  // cannot be verified from headlines, and must be checked in official PDFs.
+  { language: "bn", query: '"যেকোনো বিষয়ে" "স্নাতক" "নিয়োগ"' },
+  { language: "bn", query: '"অনার্স" "সরকারি" "নিয়োগ"' },
+  { language: "en", query: 'Bangladesh government graduate honours any subject recruitment' }
 ];
 
 export const feedUrl = ({ language, query }) => {
@@ -32,9 +37,10 @@ const xmlText = (item, tag) => {
 
 export const relevantHeadline = text => {
   const technical = /\b(programmer|developer|software engineer|network engineer|ict officer|it officer|information technology|system analyst|computer engineer|database administrator|system administrator|cybersecurity|cyber security|it specialist|ict specialist)\b|প্রোগ্রামার|সফটওয়্যার|আইসিটি|তথ্যপ্রযুক্তি|কম্পিউটার ইঞ্জিনিয়ার|আইটি অফিসার|সিস্টেম এনালিস্ট|নেটওয়ার্ক ইঞ্জিনিয়ার/iu;
+  const generalGraduate = /\b(?:graduate|bachelors?|honou?rs|any subject)\b|অনার্স|সম্মান|স্নাতক|যেকোনো বিষয়ে/iu;
   const hiring = /\b(recruitment|recruit|hiring|vacanc(?:y|ies)|job(?:s)?|career|apply|circular|posts?)\b|নিয়োগ|চাকরি|বিজ্ঞপ্তি|শূন্যপদ|আবেদন/iu;
   const notHiring = /\b(arrested|hack(?:ed)?|exam result|admit card|answer key|final result|interview result|protest|terminated)\b|গ্রেফতার|ফলাফল|পরীক্ষার ফল|প্রবেশপত্র|প্রশ্নফাঁস|স্থগিত/iu;
-  return technical.test(text) && hiring.test(text) && !notHiring.test(text);
+  return (technical.test(text) || generalGraduate.test(text)) && hiring.test(text) && !notHiring.test(text);
 };
 
 export function parseFeed(xml, checkedAt = new Date()) {
