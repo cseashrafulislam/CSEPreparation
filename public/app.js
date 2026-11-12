@@ -1,6 +1,6 @@
 import { STORAGE_KEY, loadState, saveState, normalizeState, bangladeshToday, daysRemaining, jobPhase, escapeHtml as h, safeHttps, validateCustomJob, dailyPracticeCount } from "./core.js";
 import { officialJobs, JOBS_LAST_CHECKED, sourceLinks } from "./data/jobs.js";
-import { DISCOVERY_ITEMS, DISCOVERY_LAST_RUN, DISCOVERY_FEEDS_OK } from "./data/discovered.js";
+import { DISCOVERY_ITEMS, DISCOVERY_LAST_RUN, DISCOVERY_FEEDS_OK, DISCOVERY_FEEDS_TOTAL } from "./data/discovered.js";
 import { questions, writtenQuestions, topics } from "./data/questions.js";
 import { EXAM_TRACKS, UNITS, UNIT_BY_ID, trackTopics } from "./data/curriculum.js";
 import { MASTER_NOTES } from "./data/master-notes.js";
@@ -197,11 +197,11 @@ function renderCirculars() {
   };
   const discoveryList = discovered.slice(0, 35).map(job => `<article class="discovery-card">
     <div><span class="badge urgent">যাচাই বাকি</span><small class="muted">${h(labelDate(job.publishedOn))} · ${h(job.publisher)}</small></div>
-    <h3>${h(job.title)}</h3><p>নিউজ-সূচি থেকে স্বয়ংক্রিয়ভাবে পাওয়া সম্ভাব্য বিজ্ঞপ্তি। পদ, যোগ্যতা ও আবেদনের শেষ সময় মূল নিয়োগকারী প্রতিষ্ঠানের ওয়েবসাইটে নিশ্চিত করুন।</p>
+    <h3>${h(job.title)}</h3><p>নিউজ-সূচি থেকে স্বয়ংক্রিয়ভাবে পাওয়া সম্ভাব্য বিজ্ঞপ্তি। এই লিডটি ৩০+ Honours বা CSE যোগ্য বলে যাচাই করা হয়নি—নির্দিষ্ট পদের শূন্যপদ, যোগ্যতা ও আবেদনের শেষ সময় মূল বিজ্ঞপ্তিতে নিশ্চিত করুন।</p>
     <a class="button small" href="${h(safeHttps(job.url))}" target="_blank" rel="noopener noreferrer">খবর / সূত্র দেখুন ↗</a>
   </article>`).join("");
-  const discoveryBanner = `<section class="panel discovery-panel"><div class="panel-header"><div><h2>প্রতিদিন স্বয়ংক্রিয় নতুন খোঁজ <span class="badge">${DISCOVERY_ITEMS.length} links</span></h2><p class="panel-subtitle">শেষ সফল আপডেট: ${DISCOVERY_LAST_RUN ? labelDate(DISCOVERY_LAST_RUN.slice(0, 10)) : "প্রথম অটোমেশন চালুর অপেক্ষায়"} · সফল উৎস: ${DISCOVERY_FEEDS_OK}/6</p></div></div>
-    <div class="info-banner"><b>!</b><p>এগুলো নিউজ সার্চ থেকে পাওয়া <strong>যাচাই না-করা সূত্র</strong>, নিশ্চিত চাকরির সার্কুলার নয়। ভুয়া নিয়োগ এড়াতে অফিসিয়াল PDF এবং আবেদন পোর্টালের শেষ তারিখ দেখে নিন। প্রতিদিন সকাল আনুমানিক ৭:১৭ (বাংলাদেশ সময়) GitHub Actions নতুন লিংক খোঁজে; বিলম্ব বা উৎস ব্যর্থ হলে তালিকা নাও বদলাতে পারে।</p></div>
+  const discoveryBanner = `<section class="panel discovery-panel"><div class="panel-header"><div><h2>CSE ও Honours—প্রতিদিন নতুন চাকরির সূত্র <span class="badge">${DISCOVERY_ITEMS.length} links</span></h2><p class="panel-subtitle">শেষ সফল আপডেট: ${DISCOVERY_LAST_RUN ? labelDate(DISCOVERY_LAST_RUN.slice(0, 10)) : "প্রথম অটোমেশন চালুর অপেক্ষায়"} · সফল উৎস: ${DISCOVERY_FEEDS_OK}/${DISCOVERY_FEEDS_TOTAL}</p></div></div>
+    <div class="info-banner"><b>!</b><p>এগুলো CSE ও স্নাতক নিয়োগের নিউজ সার্চ থেকে পাওয়া <strong>যাচাই না-করা সূত্র</strong>, নিশ্চিত চাকরির সার্কুলার নয়। ৩০+ পদ বা CSE যোগ্যতা এখানে অনুমান করা হয় না। ভুয়া নিয়োগ এড়াতে অফিসিয়াল PDF এবং আবেদন পোর্টালের শেষ তারিখ দেখে নিন। প্রতিদিন সকাল আনুমানিক ৭:১৭ (বাংলাদেশ সময়) GitHub Actions নতুন লিংক খোঁজে; বিলম্ব বা উৎস ব্যর্থ হলে তালিকা নাও বদলাতে পারে।</p></div>
     ${ui.jobStatus !== "All" || ui.jobSector !== "All" ? '<p class="side-tip">নতুন খোঁজ দেখতে Status ও Sector ফিল্টার “সব” রাখুন।</p>' : (discovered.length ? `<div class="discovery-grid">${discoveryList}</div><p class="caption mt">খুঁজে পাওয়া ${discovered.length}টির মধ্যে প্রথম ${Math.min(discovered.length, 35)}টি দেখানো হচ্ছে।</p>` : '<p class="side-tip">এখনো নতুন প্রাসঙ্গিক লিংক নেই। অটোমেশন প্রথমবার সফল হলে এখানে দেখাবে।</p>')}
     </section>`;
   return `${section("BSc CSE + Honours সরকারি সার্কুলার", "CSE-যোগ্য সব পদ (১টি হলেও) · যেকোনো বিষয়ে ৪ বছরের অনার্স/সমমান গ্রহণ করে এমন পদে ন্যূনতম ৩০টি শূন্যপদ।",
